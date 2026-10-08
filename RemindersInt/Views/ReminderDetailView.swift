@@ -6,6 +6,8 @@ struct ReminderDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
+    @State private var isConfirmingDelete = false
+    @State private var shouldDelete = false
 
     var body: some View {
         NavigationStack {
@@ -24,7 +26,7 @@ struct ReminderDetailView: View {
                             Divider()
                             detailRow("Relance", reminder.repeatInterval.label)
                             Divider()
-                            detailRow("Relances envoyées", "\(reminder.remindersSent)")
+                            detailRow("Notifications envoyées", "\(reminder.remindersSent)")
                             Divider()
                             detailRow("Statut", reminder.status.label)
                         }
@@ -47,6 +49,19 @@ struct ReminderDetailView: View {
             .sheet(isPresented: $isEditing) {
                 ReminderFormView(reminder: reminder)
             }
+            .confirmationDialog("Supprimer ce rappel ?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+                Button("Supprimer", role: .destructive) {
+                    shouldDelete = true
+                    dismiss()
+                }
+                Button("Garder", role: .cancel) {}
+            } message: {
+                Text("Le rappel et ses notifications seront supprimés.")
+            }
+        }
+        // Delete once the sheet is gone, so the view never renders a deleted model.
+        .onDisappear {
+            if shouldDelete { NotificationService.shared.delete(reminder) }
         }
     }
 
@@ -63,11 +78,16 @@ struct ReminderDetailView: View {
     }
 
     private var actionButtons: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                statusButton("Annuler", systemImage: "xmark", color: Palette.red, status: .cancelled)
-                statusButton("Fait", systemImage: "checkmark", color: Palette.green, status: .done)
+        VStack(spacing: 12) {
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    statusButton("Annuler", systemImage: "xmark", color: Palette.red, status: .cancelled)
+                    statusButton("Fait", systemImage: "checkmark", color: Palette.green, status: .done)
+                }
             }
+            Button("Supprimer") { isConfirmingDelete = true }
+                .font(.subheadline)
+                .foregroundStyle(Palette.secondary)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 8)

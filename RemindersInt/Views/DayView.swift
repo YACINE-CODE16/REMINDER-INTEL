@@ -7,6 +7,7 @@ struct DayView: View {
 
     @Query(sort: \Reminder.dueDate) private var reminders: [Reminder]
     @State private var detailReminder: Reminder?
+    @State private var reminderToDelete: Reminder?
 
     private let calendar = Calendar.app
 
@@ -127,8 +128,16 @@ struct DayView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                // Swipe left: done.
+                // Swipe left: full swipe deletes (after confirmation), partial swipe also shows Done.
+                // No destructive role, so the row stays in place until the deletion is confirmed.
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button {
+                        reminderToDelete = reminder
+                    } label: {
+                        Label("Supprimer", systemImage: "trash")
+                    }
+                    .tint(Palette.red)
+
                     Button {
                         setStatus(.done, for: reminder)
                     } label: {
@@ -149,6 +158,22 @@ struct DayView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .confirmationDialog(
+            "Supprimer ce rappel ?",
+            isPresented: Binding(
+                get: { reminderToDelete != nil },
+                set: { if !$0 { reminderToDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: reminderToDelete
+        ) { reminder in
+            Button("Supprimer", role: .destructive) {
+                withAnimation { NotificationService.shared.delete(reminder) }
+            }
+            Button("Garder", role: .cancel) {}
+        } message: { reminder in
+            Text("« \(reminder.title) » et ses notifications seront supprimés.")
+        }
     }
 
     private func setStatus(_ status: ReminderStatus, for reminder: Reminder) {

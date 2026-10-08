@@ -80,6 +80,14 @@ final class NotificationService: NSObject {
         try? reminder.modelContext?.save()
     }
 
+    /// Cancels the notifications of a reminder, then deletes it from the store.
+    func delete(_ reminder: Reminder) {
+        cancel(reminder)
+        guard let context = reminder.modelContext else { return }
+        context.delete(reminder)
+        try? context.save()
+    }
+
     /// Rebuilds every pending request from the store, keeping the 64 soonest overall.
     func rescheduleAllPending() {
         center.removeAllPendingNotificationRequests()
