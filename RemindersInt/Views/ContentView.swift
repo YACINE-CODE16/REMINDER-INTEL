@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var voiceDraft: VoiceDraft?
     @State private var pendingVoiceDraft: VoiceDraft?
     @State private var toastMessage: String?
-    @State private var notificationReminder: Reminder?
+    @State private var detailReminder: Reminder?
 
     private let notifications = NotificationService.shared
     private let captureRequests = VoiceCaptureRequests.shared
@@ -26,9 +26,17 @@ struct ContentView: View {
 
             switch selectedTab {
             case .day:
-                DayView(selectedDate: $selectedDate) { selectedTab = .month }
+                DayView(
+                    selectedDate: $selectedDate,
+                    onShowCalendar: { selectedTab = .month },
+                    onSelect: { detailReminder = $0 }
+                )
             case .month:
-                MonthView(selectedDate: $selectedDate) { selectedTab = .day }
+                MonthView(
+                    selectedDate: $selectedDate,
+                    onShowDay: { selectedTab = .day },
+                    onSelect: { detailReminder = $0 }
+                )
             case .settings:
                 SettingsView()
             }
@@ -75,7 +83,7 @@ struct ContentView: View {
                 repeatInterval: defaultRepeatInterval
             )
         }
-        .sheet(item: $notificationReminder) { reminder in
+        .sheet(item: $detailReminder) { reminder in
             ReminderDetailView(reminder: reminder)
         }
         .task {
@@ -107,7 +115,7 @@ struct ContentView: View {
             // A deleted reminder simply leaves the app on the day view.
             guard let reminder = notifications.reminder(with: id) else { return }
             selectedDate = Calendar.app.startOfDay(for: reminder.dueDate)
-            notificationReminder = reminder
+            detailReminder = reminder
         }
     }
 
@@ -130,7 +138,7 @@ struct ContentView: View {
     private func openVoiceCapture() {
         isAddingReminder = false
         voiceDraft = nil
-        notificationReminder = nil
+        detailReminder = nil
         isCapturingVoice = true
     }
 }

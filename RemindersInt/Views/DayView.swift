@@ -4,9 +4,10 @@ import SwiftData
 struct DayView: View {
     @Binding var selectedDate: Date
     var onShowCalendar: () -> Void
+    /// The detail sheet is owned by the root view, so a deep link can close it.
+    var onSelect: (Reminder) -> Void
 
     @Query(sort: \Reminder.dueDate) private var reminders: [Reminder]
-    @State private var detailReminder: Reminder?
     @State private var reminderToDelete: Reminder?
 
     private let calendar = Calendar.app
@@ -22,9 +23,6 @@ struct DayView: View {
             reminderList
         }
         .padding(.top, 8)
-        .sheet(item: $detailReminder) { reminder in
-            ReminderDetailView(reminder: reminder)
-        }
     }
 
     // MARK: - Header
@@ -120,7 +118,7 @@ struct DayView: View {
 
             ForEach(dayReminders) { reminder in
                 Button {
-                    detailReminder = reminder
+                    onSelect(reminder)
                 } label: {
                     ReminderCard(reminder: reminder)
                 }
@@ -182,7 +180,7 @@ struct DayView: View {
 }
 
 #Preview {
-    DayView(selectedDate: .constant(.now)) {}
+    DayView(selectedDate: .constant(.now), onShowCalendar: {}, onSelect: { _ in })
         .background(AppBackground())
         .modelContainer(for: Reminder.self, inMemory: true)
 }

@@ -4,16 +4,18 @@ import SwiftData
 struct MonthView: View {
     @Binding var selectedDate: Date
     var onShowDay: () -> Void
+    /// The detail sheet is owned by the root view, so a deep link can close it.
+    var onSelect: (Reminder) -> Void
 
     @Query(sort: \Reminder.dueDate) private var reminders: [Reminder]
     @State private var displayedMonth: Date
-    @State private var detailReminder: Reminder?
 
     private let calendar = Calendar.app
 
-    init(selectedDate: Binding<Date>, onShowDay: @escaping () -> Void) {
+    init(selectedDate: Binding<Date>, onShowDay: @escaping () -> Void, onSelect: @escaping (Reminder) -> Void) {
         _selectedDate = selectedDate
         self.onShowDay = onShowDay
+        self.onSelect = onSelect
         _displayedMonth = State(initialValue: Calendar.app.startOfMonth(for: selectedDate.wrappedValue))
     }
 
@@ -31,9 +33,6 @@ struct MonthView: View {
             .padding(.bottom, 20)
         }
         .scrollIndicators(.hidden)
-        .sheet(item: $detailReminder) { reminder in
-            ReminderDetailView(reminder: reminder)
-        }
     }
 
     // MARK: - Header
@@ -173,7 +172,7 @@ struct MonthView: View {
             } else {
                 ForEach(selectedDayReminders) { reminder in
                     Button {
-                        detailReminder = reminder
+                        onSelect(reminder)
                     } label: {
                         ReminderCard(reminder: reminder)
                     }
@@ -185,7 +184,7 @@ struct MonthView: View {
 }
 
 #Preview {
-    MonthView(selectedDate: .constant(.now)) {}
+    MonthView(selectedDate: .constant(.now), onShowDay: {}, onSelect: { _ in })
         .background(AppBackground())
         .modelContainer(for: Reminder.self, inMemory: true)
 }

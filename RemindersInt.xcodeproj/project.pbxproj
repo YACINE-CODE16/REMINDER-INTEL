@@ -34,12 +34,17 @@
 		};
 /* End PBXCopyFilesBuildPhase section */
 
+/* Begin PBXFileReference section */
+		BBBB00000000000000000001 /* RemindersIntWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RemindersIntWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DFB33B1A3077E7C8009EB21E /* RemindersInt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindersInt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DFB33B2A3077EF81009EB21E /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		BBBB00000000000000000011 /* Exceptions for "RemindersIntWidget" folder in "RemindersIntWidget" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				RemindersIntWidget.entitlements,
 			);
 			target = BBBB00000000000000000007 /* RemindersIntWidget */;
 		};
@@ -47,35 +52,12 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				RemindersInt.entitlements,
 			);
 			target = DFB33B193077E7C8009EB21E /* RemindersInt */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXTargetDependency section */
-		BBBB00000000000000000014 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = BBBB00000000000000000007 /* RemindersIntWidget */;
-			targetProxy = BBBB00000000000000000013 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
-/* Begin PBXFileReference section */
-		BBBB00000000000000000001 /* RemindersIntWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RemindersIntWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		DFB33B1A3077E7C8009EB21E /* RemindersInt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindersInt.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		DFB33B2A3077EF81009EB21E /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
-/* End PBXFileReference section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		DFB33B1C3077E7C8009EB21E /* RemindersInt */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BBBB00000000000000000012 /* Exceptions for "RemindersInt" folder in "RemindersInt" target */,
-			);
-			path = RemindersInt;
-			sourceTree = "<group>";
-		};
 		BBBB00000000000000000002 /* RemindersIntWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -89,17 +71,25 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		DFB33B1C3077E7C8009EB21E /* RemindersInt */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BBBB00000000000000000012 /* Exceptions for "RemindersInt" folder in "RemindersInt" target */,
+			);
+			path = RemindersInt;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		DFB33B173077E7C8009EB21E /* Frameworks */ = {
+		BBBB00000000000000000005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BBBB00000000000000000005 /* Frameworks */ = {
+		DFB33B173077E7C8009EB21E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -132,31 +122,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		DFB33B193077E7C8009EB21E /* RemindersInt */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = DFB33B273077E7CC009EB21E /* Build configuration list for PBXNativeTarget "RemindersInt" */;
-			buildPhases = (
-				DFB33B163077E7C8009EB21E /* Sources */,
-				DFB33B173077E7C8009EB21E /* Frameworks */,
-				DFB33B183077E7C8009EB21E /* Resources */,
-				BBBB00000000000000000016 /* Embed Foundation Extensions */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				BBBB00000000000000000014 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				DFB33B1C3077E7C8009EB21E /* RemindersInt */,
-				BBBB00000000000000000003 /* Shared */,
-			);
-			name = RemindersInt;
-			packageProductDependencies = (
-			);
-			productName = RemindersInt;
-			productReference = DFB33B1A3077E7C8009EB21E /* RemindersInt.app */;
-			productType = "com.apple.product-type.application";
-		};
 		BBBB00000000000000000007 /* RemindersIntWidget */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BBBB00000000000000000008 /* Build configuration list for PBXNativeTarget "RemindersIntWidget" */;
@@ -180,6 +145,31 @@
 			productReference = BBBB00000000000000000001 /* RemindersIntWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		DFB33B193077E7C8009EB21E /* RemindersInt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DFB33B273077E7CC009EB21E /* Build configuration list for PBXNativeTarget "RemindersInt" */;
+			buildPhases = (
+				DFB33B163077E7C8009EB21E /* Sources */,
+				DFB33B173077E7C8009EB21E /* Frameworks */,
+				DFB33B183077E7C8009EB21E /* Resources */,
+				BBBB00000000000000000016 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BBBB00000000000000000014 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BBBB00000000000000000003 /* Shared */,
+				DFB33B1C3077E7C8009EB21E /* RemindersInt */,
+			);
+			name = RemindersInt;
+			packageProductDependencies = (
+			);
+			productName = RemindersInt;
+			productReference = DFB33B1A3077E7C8009EB21E /* RemindersInt.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -190,10 +180,10 @@
 				LastSwiftUpdateCheck = 2660;
 				LastUpgradeCheck = 2660;
 				TargetAttributes = {
-					DFB33B193077E7C8009EB21E = {
+					BBBB00000000000000000007 = {
 						CreatedOnToolsVersion = 26.6;
 					};
-					BBBB00000000000000000007 = {
+					DFB33B193077E7C8009EB21E = {
 						CreatedOnToolsVersion = 26.6;
 					};
 				};
@@ -219,14 +209,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		DFB33B183077E7C8009EB21E /* Resources */ = {
+		BBBB00000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BBBB00000000000000000006 /* Resources */ = {
+		DFB33B183077E7C8009EB21E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -236,14 +226,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		DFB33B163077E7C8009EB21E /* Sources */ = {
+		BBBB00000000000000000004 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BBBB00000000000000000004 /* Sources */ = {
+		DFB33B163077E7C8009EB21E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -252,7 +242,77 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BBBB00000000000000000014 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BBBB00000000000000000007 /* RemindersIntWidget */;
+			targetProxy = BBBB00000000000000000013 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		BBBB00000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RemindersIntWidget/RemindersIntWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = V95Y2LCL84;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RemindersIntWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RemindersInt;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yacine.RemindersInt.RemindersIntWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BBBB00000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RemindersIntWidget/RemindersIntWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = V95Y2LCL84;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RemindersIntWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RemindersInt;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yacine.RemindersInt.RemindersIntWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		DFB33B253077E7CC009EB21E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -446,71 +506,18 @@
 			};
 			name = Release;
 		};
-		BBBB00000000000000000009 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = RemindersIntWidget/RemindersIntWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V95Y2LCL84;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = RemindersIntWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = RemindersInt;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yacine.RemindersInt.RemindersIntWidget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		BBBB00000000000000000010 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = RemindersIntWidget/RemindersIntWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V95Y2LCL84;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = RemindersIntWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = RemindersInt;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yacine.RemindersInt.RemindersIntWidget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		BBBB00000000000000000008 /* Build configuration list for PBXNativeTarget "RemindersIntWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BBBB00000000000000000009 /* Debug */,
+				BBBB00000000000000000010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		DFB33B153077E7C8009EB21E /* Build configuration list for PBXProject "RemindersInt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -525,15 +532,6 @@
 			buildConfigurations = (
 				DFB33B283077E7CC009EB21E /* Debug */,
 				DFB33B293077E7CC009EB21E /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		BBBB00000000000000000008 /* Build configuration list for PBXNativeTarget "RemindersIntWidget" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BBBB00000000000000000009 /* Debug */,
-				BBBB00000000000000000010 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
