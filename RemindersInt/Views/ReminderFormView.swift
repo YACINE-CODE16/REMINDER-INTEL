@@ -93,13 +93,18 @@ struct ReminderFormView: View {
 
     private func save() {
         let date = Self.truncatedToMinute(dueDate)
+        let saved: Reminder
         if let reminder {
             reminder.title = trimmedTitle
             reminder.dueDate = date
             reminder.repeatInterval = repeatInterval
+            saved = reminder
         } else {
-            modelContext.insert(Reminder(title: trimmedTitle, dueDate: date, repeatInterval: repeatInterval))
+            saved = Reminder(title: trimmedTitle, dueDate: date, repeatInterval: repeatInterval)
+            modelContext.insert(saved)
         }
+        try? modelContext.save()
+        NotificationService.shared.schedule(saved)
         dismiss()
     }
 }

@@ -19,6 +19,28 @@ nonisolated enum RepeatInterval: String, Codable, CaseIterable, Identifiable {
         case .hourly: "Toutes les heures"
         }
     }
+
+    /// Delay between two notifications, nil when the reminder does not repeat.
+    var duration: TimeInterval? {
+        switch self {
+        case .none: nil
+        case .every5min: 5 * 60
+        case .every15min: 15 * 60
+        case .every30min: 30 * 60
+        case .hourly: 60 * 60
+        }
+    }
+
+    /// Compact form used in notification subtitles ("15 min", "1 h").
+    var shortLabel: String {
+        switch self {
+        case .none: ""
+        case .every5min: "5 min"
+        case .every15min: "15 min"
+        case .every30min: "30 min"
+        case .hourly: "1 h"
+        }
+    }
 }
 
 nonisolated enum ReminderStatus: String, Codable, CaseIterable, Identifiable {

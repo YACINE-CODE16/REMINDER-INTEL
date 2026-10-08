@@ -4,12 +4,16 @@ import SwiftData
 /// Root view: current tab content plus the floating tab bar.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppStorageKey.hasSeededDemoData) private var hasSeededDemoData = false
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
 
     @State private var selectedTab: AppTab = .day
     @State private var selectedDate = Calendar.app.startOfDay(for: .now)
     @State private var isAddingReminder = false
+    @State private var notificationReminder: Reminder?
+
+    private let notifications = NotificationService.shared
 
     var body: some View {
         ZStack {
@@ -36,10 +40,26 @@ struct ContentView: View {
                 repeatInterval: defaultRepeatInterval
             )
         }
+        .sheet(item: $notificationReminder) { reminder in
+            ReminderDetailView(reminder: reminder)
+        }
         .task {
-            guard !hasSeededDemoData else { return }
-            DemoData.insert(into: modelContext)
-            hasSeededDemoData = true
+            if !hasSeededDemoData {
+                DemoData.insert(into: modelContext)
+                try? modelContext.save()
+                hasSeededDemoData = true
+            }
+            await notifications.requestAuthorization()
+            // Safety net after a reinstall or a missed update.
+            notifications.rescheduleAllPending()
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active { notifications.syncSentCounts() }
+        }
+        .onChange(of: notifications.reminderToOpen, initial: true) { _, id in
+            guard let id else { return }
+            notificationReminder = notifications.reminder(with: id)
+            notifications.reminderToOpen = nil
         }
     }
 }

@@ -152,7 +152,7 @@ struct DayView: View {
     }
 
     private func setStatus(_ status: ReminderStatus, for reminder: Reminder) {
-        withAnimation { reminder.status = status }
+        withAnimation { NotificationService.shared.setStatus(status, for: reminder) }
     }
 }
 

@@ -75,7 +75,7 @@ struct ReminderDetailView: View {
 
     private func statusButton(_ title: String, systemImage: String, color: Color, status: ReminderStatus) -> some View {
         Button {
-            reminder.status = status
+            NotificationService.shared.setStatus(status, for: reminder)
             dismiss()
         } label: {
             Label(title, systemImage: systemImage)
