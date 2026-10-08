@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var notificationReminder: Reminder?
 
     private let notifications = NotificationService.shared
+    private let captureRequests = VoiceCaptureRequests.shared
 
     var body: some View {
         ZStack {
@@ -89,8 +90,16 @@ struct ContentView: View {
             notifications.rescheduleAllPending()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
-            if phase == .active { notifications.syncSentCounts() }
+            guard phase == .active else { return }
+            notifications.syncSentCounts()
+            // Lock screen control whose intent ran in the widget extension.
+            if captureRequests.takePending() { openVoiceCapture() }
         }
+        // Lock screen control whose intent ran in the app process.
+        .onChange(of: captureRequests.count) {
+            if captureRequests.takePending() { openVoiceCapture() }
+        }
+        .onOpenURL(perform: handleDeepLink)
         .onChange(of: notifications.reminderToOpen, initial: true) { _, id in
             guard let id else { return }
             notifications.reminderToOpen = nil
@@ -100,6 +109,29 @@ struct ContentView: View {
             selectedDate = Calendar.app.startOfDay(for: reminder.dueDate)
             notificationReminder = reminder
         }
+    }
+
+    /// remindersint://capture opens the dictation, remindersint://reminder/<uuid> a detail.
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "remindersint" else { return }
+        switch url.host() {
+        case "capture":
+            openVoiceCapture()
+        case "reminder":
+            if let id = UUID(uuidString: url.lastPathComponent) {
+                notifications.reminderToOpen = id
+            }
+        default:
+            break
+        }
+    }
+
+    /// Closes the root sheets so the capture can be presented; it starts listening on appear.
+    private func openVoiceCapture() {
+        isAddingReminder = false
+        voiceDraft = nil
+        notificationReminder = nil
+        isCapturingVoice = true
     }
 }
 

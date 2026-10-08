@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftData
 import UserNotifications
+import WidgetKit
 
 /// Schedules local notifications for reminders and handles their actions.
 @Observable
@@ -61,6 +62,7 @@ final class NotificationService: NSObject {
     /// Replaces the notifications of a reminder; schedules nothing unless it is pending.
     func schedule(_ reminder: Reminder) {
         cancel(reminder)
+        defer { refreshWidget() }
         guard reminder.status == .pending else { return }
         for item in requests(for: reminder, after: .now) {
             center.add(item.request)
@@ -92,6 +94,7 @@ final class NotificationService: NSObject {
         guard let context = reminder.modelContext else { return }
         context.delete(reminder)
         try? context.save()
+        refreshWidget()
     }
 
     /// Rebuilds every pending request from the store, keeping the 64 soonest overall.
@@ -105,6 +108,19 @@ final class NotificationService: NSObject {
         for item in items {
             center.add(item.request)
         }
+        refreshWidget()
+    }
+
+    /// Publishes the upcoming pending reminders to the lock screen widget.
+    private func refreshWidget() {
+        let now = Date.now
+        let upcoming = pendingReminders()
+            .filter { $0.dueDate > now }
+            .sorted { $0.dueDate < $1.dueDate }
+            .prefix(20)
+            .map { WidgetSnapshot.Item(id: $0.id, title: $0.title, dueDate: $0.dueDate) }
+        WidgetSnapshot(upcoming: Array(upcoming)).save()
+        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.nextReminder)
     }
 
     /// Fire dates of the first notification and its follow-ups.
