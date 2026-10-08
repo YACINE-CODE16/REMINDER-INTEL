@@ -13,6 +13,8 @@ final class NotificationService: NSObject {
     static let cancelActionIdentifier = "CANCEL"
     /// Follow-ups per reminder, bounded to stay under the iOS limit of 64 pending notifications.
     static let maxFollowUps = 20
+    nonisolated static let reminderIDKey = "reminderID"
+    nonisolated static let indexKey = "index"
     private static let maxPendingRequests = 64
 
     /// Set when the user taps a notification; the root view opens the matching detail.
@@ -67,7 +69,11 @@ final class NotificationService: NSObject {
 
     /// Removes pending and delivered notifications of a reminder.
     func cancel(_ reminder: Reminder) {
-        let identifiers = (0...Self.maxFollowUps).map { Self.identifier(for: reminder.id, index: $0) }
+        cancel(reminderID: reminder.id)
+    }
+
+    private func cancel(reminderID: UUID) {
+        let identifiers = (0...Self.maxFollowUps).map { Self.identifier(for: reminderID, index: $0) }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
         center.removeDeliveredNotifications(withIdentifiers: identifiers)
     }
@@ -120,6 +126,7 @@ final class NotificationService: NSObject {
             }
             content.sound = .default
             content.categoryIdentifier = Self.categoryIdentifier
+            content.userInfo = [Self.reminderIDKey: reminder.id.uuidString, Self.indexKey: index]
 
             let components = Calendar.app.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
@@ -184,11 +191,11 @@ final class NotificationService: NSObject {
 
     // MARK: - Identifiers
 
-    static func identifier(for id: UUID, index: Int) -> String {
+    nonisolated static func identifier(for id: UUID, index: Int) -> String {
         "\(id.uuidString)-\(index)"
     }
 
-    static func parse(_ identifier: String) -> (id: UUID, index: Int)? {
+    nonisolated static func parse(_ identifier: String) -> (id: UUID, index: Int)? {
         guard let dash = identifier.lastIndex(of: "-"),
               let id = UUID(uuidString: String(identifier[..<dash])),
               let index = Int(identifier[identifier.index(after: dash)...])
@@ -198,51 +205,79 @@ final class NotificationService: NSObject {
 
     // MARK: - Delegate handling
 
-    fileprivate func recordDelivery(of identifier: String) {
-        guard let parsed = Self.parse(identifier),
-              let reminder = reminder(with: parsed.id),
-              reminder.status == .pending
-        else { return }
-        markSent(reminder, count: parsed.index + 1)
+    typealias Target = (id: UUID, index: Int)
+
+    /// Reads the reminder id from userInfo, falling back to the request identifier "<uuid>-<k>".
+    nonisolated static func target(of notification: UNNotification) -> Target? {
+        let userInfo = notification.request.content.userInfo
+        if let idString = userInfo[reminderIDKey] as? String, let id = UUID(uuidString: idString) {
+            return (id, userInfo[indexKey] as? Int ?? 0)
+        }
+        return parse(notification.request.identifier)
+    }
+
+    fileprivate func recordDelivery(of target: Target?) {
+        guard let target, let reminder = reminder(with: target.id), reminder.status == .pending else { return }
+        markSent(reminder, count: target.index + 1)
         try? reminder.modelContext?.save()
     }
 
-    fileprivate func handleResponse(action: String, identifier: String) {
-        guard let parsed = Self.parse(identifier), let reminder = reminder(with: parsed.id) else { return }
-        if reminder.status == .pending {
-            markSent(reminder, count: parsed.index + 1)
+    fileprivate func handleResponse(action: String, target: Target?) {
+        guard let target else { return }
+        let reminder = reminder(with: target.id)
+        if let reminder, reminder.status == .pending {
+            markSent(reminder, count: target.index + 1)
         }
         switch action {
-        case Self.doneActionIdentifier:
-            setStatus(.done, for: reminder)
-        case Self.cancelActionIdentifier:
-            setStatus(.cancelled, for: reminder)
+        case Self.doneActionIdentifier, Self.cancelActionIdentifier:
+            if let reminder {
+                setStatus(action == Self.doneActionIdentifier ? .done : .cancelled, for: reminder)
+            } else {
+                // Reminder deleted meanwhile: just clear its leftover notifications.
+                cancel(reminderID: target.id)
+            }
         case UNNotificationDefaultActionIdentifier:
-            reminderToOpen = reminder.id
+            // The root view opens the detail, or stays on the day view if the reminder is gone.
+            reminderToOpen = target.id
         default:
             break
         }
-        try? reminder.modelContext?.save()
+        try? modelContainer?.mainContext.save()
     }
 }
 
+// The completion-handler variants are used on purpose. With the async variants, the
+// compiler-generated @objc thunk calls UIKit's completion handler from the Swift
+// concurrency pool once the method returns; UIKit asserts it runs on the main thread
+// and aborts the app (crash on notification tap). Here the handler is always called
+// on the main actor.
 extension NotificationService: UNUserNotificationCenterDelegate {
     /// Shows notifications while the app is in the foreground.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        let identifier = notification.request.identifier
-        await recordDelivery(of: identifier)
-        return [.banner, .list, .sound]
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let target = Self.target(of: notification)
+        // UIKit's handler is not annotated Sendable; it is called exactly once, on the main actor.
+        nonisolated(unsafe) let completion = completionHandler
+        Task { @MainActor in
+            self.recordDelivery(of: target)
+            completion([.banner, .list, .sound])
+        }
     }
 
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let identifier = response.notification.request.identifier
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let target = Self.target(of: response.notification)
         let action = response.actionIdentifier
-        await handleResponse(action: action, identifier: identifier)
+        nonisolated(unsafe) let completion = completionHandler
+        Task { @MainActor in
+            self.handleResponse(action: action, target: target)
+            completion()
+        }
     }
 }

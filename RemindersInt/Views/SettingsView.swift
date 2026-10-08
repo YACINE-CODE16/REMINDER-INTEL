@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
     @State private var isTestScheduled = false
+    @State private var cleanupMessage: String?
+
+    private static let testReminderTitle = "Test de notification"
 
     var body: some View {
         ScrollView {
@@ -56,15 +59,50 @@ struct SettingsView: View {
                         .foregroundStyle(Palette.secondary)
                         .padding(.horizontal, 4)
                 }
+
+                GlassCard {
+                    Button(action: completeTestReminders) {
+                        HStack {
+                            Text("Marquer tous les rappels de test comme faits")
+                                .foregroundStyle(Palette.text)
+                            Spacer()
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(Palette.green)
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let cleanupMessage {
+                    Text(cleanupMessage)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondary)
+                        .padding(.horizontal, 4)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
         }
     }
 
+    private func completeTestReminders() {
+        let title = Self.testReminderTitle
+        let descriptor = FetchDescriptor<Reminder>(predicate: #Predicate { $0.title == title })
+        let pending = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .pending }
+        for reminder in pending {
+            NotificationService.shared.setStatus(.done, for: reminder)
+        }
+        cleanupMessage = switch pending.count {
+        case 0: "Aucun rappel de test en cours."
+        case 1: "1 rappel de test marqué comme fait."
+        default: "\(pending.count) rappels de test marqués comme faits."
+        }
+    }
+
     private func scheduleTestNotification() {
         let reminder = Reminder(
-            title: "Test de notification",
+            title: Self.testReminderTitle,
             dueDate: .now.addingTimeInterval(10),
             repeatInterval: .every5min
         )

@@ -58,8 +58,12 @@ struct ContentView: View {
         }
         .onChange(of: notifications.reminderToOpen, initial: true) { _, id in
             guard let id else { return }
-            notificationReminder = notifications.reminder(with: id)
             notifications.reminderToOpen = nil
+            selectedTab = .day
+            // A deleted reminder simply leaves the app on the day view.
+            guard let reminder = notifications.reminder(with: id) else { return }
+            selectedDate = Calendar.app.startOfDay(for: reminder.dueDate)
+            notificationReminder = reminder
         }
     }
 }
