@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		DFB33B2B3077EF8A009EB21E /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = DFB33B2A3077EF81009EB21E /* CLAUDE.md */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		DFB33B1A3077E7C8009EB21E /* RemindersInt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RemindersInt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFB33B2A3077EF81009EB21E /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
@@ -115,7 +111,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DFB33B2B3077EF8A009EB21E /* CLAUDE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,6 +258,8 @@
 				DEVELOPMENT_TEAM = V95Y2LCL84;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Le micro sert à dicter vos rappels.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "La reconnaissance vocale transforme votre dictée en rappel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -295,6 +292,8 @@
 				DEVELOPMENT_TEAM = V95Y2LCL84;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Le micro sert à dicter vos rappels.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "La reconnaissance vocale transforme votre dictée en rappel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -7,6 +7,7 @@ struct ReminderFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let reminder: Reminder?
+    private let rawTranscript: String?
 
     @State private var title: String
     @State private var dueDate: Date
@@ -16,15 +17,17 @@ struct ReminderFormView: View {
     /// Edit an existing reminder.
     init(reminder: Reminder) {
         self.reminder = reminder
+        self.rawTranscript = nil
         _title = State(initialValue: reminder.title)
         _dueDate = State(initialValue: reminder.dueDate)
         _repeatInterval = State(initialValue: reminder.repeatInterval)
     }
 
-    /// Create a new reminder.
-    init(initialDate: Date, repeatInterval: RepeatInterval) {
+    /// Create a new reminder, optionally pre-filled from a dictation without a date.
+    init(initialDate: Date, repeatInterval: RepeatInterval, title: String = "", rawTranscript: String? = nil) {
         self.reminder = nil
-        _title = State(initialValue: "")
+        self.rawTranscript = rawTranscript
+        _title = State(initialValue: title)
         _dueDate = State(initialValue: initialDate)
         _repeatInterval = State(initialValue: repeatInterval)
     }
@@ -86,7 +89,7 @@ struct ReminderFormView: View {
                 }
             }
             .onAppear {
-                if reminder == nil { isTitleFocused = true }
+                if reminder == nil, title.isEmpty { isTitleFocused = true }
             }
         }
     }
@@ -100,7 +103,7 @@ struct ReminderFormView: View {
             reminder.repeatInterval = repeatInterval
             saved = reminder
         } else {
-            saved = Reminder(title: trimmedTitle, dueDate: date, repeatInterval: repeatInterval)
+            saved = Reminder(title: trimmedTitle, dueDate: date, repeatInterval: repeatInterval, rawTranscript: rawTranscript)
             modelContext.insert(saved)
         }
         try? modelContext.save()

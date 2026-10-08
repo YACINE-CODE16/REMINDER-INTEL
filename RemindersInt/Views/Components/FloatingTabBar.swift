@@ -28,8 +28,10 @@ enum AppTab: CaseIterable, Identifiable {
 struct FloatingTabBar: View {
     @Binding var selectedTab: AppTab
     var onMicrophone: () -> Void
+    var onManualEntry: () -> Void
 
     @Namespace private var namespace
+    @State private var longPressCount = 0
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
@@ -42,16 +44,24 @@ struct FloatingTabBar: View {
                 .padding(6)
                 .glassEffect(.regular.interactive(), in: .capsule)
 
-                Button(action: onMicrophone) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 64, height: 64)
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.tint(Palette.green).interactive(), in: .circle)
-                .accessibilityLabel("Nouveau rappel")
+                // Tap: voice capture. Long press: manual form.
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 64, height: 64)
+                    .contentShape(.circle)
+                    .glassEffect(.regular.tint(Palette.green).interactive(), in: .circle)
+                    .onTapGesture(perform: onMicrophone)
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        longPressCount += 1
+                        onManualEntry()
+                    }
+                    .sensoryFeedback(.impact, trigger: longPressCount)
+                    .accessibilityElement()
+                    .accessibilityLabel("Dicter un rappel")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(.default, onMicrophone)
+                    .accessibilityAction(named: "Saisie manuelle", onManualEntry)
             }
         }
         .padding(.horizontal, 20)

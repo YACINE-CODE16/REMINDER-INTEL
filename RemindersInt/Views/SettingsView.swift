@@ -17,6 +17,15 @@ struct SettingsView: View {
                     .foregroundStyle(Palette.text)
                     .padding(.bottom, 8)
 
+                if !ParserService.shared.isModelAvailable {
+                    GlassCard {
+                        Label("Extraction IA indisponible sur cet appareil, mode simplifié", systemImage: "sparkles")
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.secondary)
+                    }
+                    .padding(.bottom, 12)
+                }
+
                 GlassCard {
                     HStack {
                         Text("Relance par défaut")
