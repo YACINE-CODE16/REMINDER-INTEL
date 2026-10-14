@@ -15,19 +15,16 @@ struct StatsView: View {
 
     private let calendar = Calendar.app
 
-    /// This week (Monday to Sunday) or the last 30 days, today included.
+    private var dayCount: Int { range == .week ? 7 : 30 }
+
+    /// The last 7 or 30 days, today included (rolling; the hub keeps the calendar week).
     private func interval(now: Date) -> DateInterval {
-        switch range {
-        case .week:
-            return TimeTotals.week(containing: now)
-        case .month:
-            let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
-            let start = calendar.date(byAdding: .day, value: -30, to: tomorrow) ?? now
-            return DateInterval(start: start, end: tomorrow)
-        }
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+        let start = calendar.date(byAdding: .day, value: -dayCount, to: tomorrow) ?? now
+        return DateInterval(start: start, end: tomorrow)
     }
 
-    private var rangeLabel: String { range == .week ? "cette semaine" : "sur 30 jours" }
+    private var rangeLabel: String { range == .week ? "7 derniers jours" : "30 derniers jours" }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -170,7 +167,6 @@ struct StatsView: View {
     private struct DayBar: Identifiable {
         let id: Date
         let isToday: Bool
-        let isFuture: Bool
         let segments: [(color: Color, seconds: TimeInterval)]
         var total: TimeInterval { segments.reduce(0) { $0 + $1.seconds } }
     }
@@ -184,7 +180,6 @@ struct StatsView: View {
             result.append(DayBar(
                 id: day,
                 isToday: calendar.isDate(day, inSameDayAs: now),
-                isFuture: day > now,
                 segments: roots.map { ($0.space.color, $0.seconds) }
             ))
             day = interval.end
@@ -194,8 +189,7 @@ struct StatsView: View {
 
     private func dailyCard(period: DateInterval, now: Date) -> some View {
         let bars = days(period: period, now: now)
-        let elapsed = max(1, bars.filter { !$0.isFuture }.count)
-        let average = bars.reduce(0) { $0 + $1.total } / Double(elapsed)
+        let average = bars.reduce(0) { $0 + $1.total } / Double(dayCount)
         let maximum = max(bars.map(\.total).max() ?? 0, 3600)
         return GlassCard(cornerRadius: 28, padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
