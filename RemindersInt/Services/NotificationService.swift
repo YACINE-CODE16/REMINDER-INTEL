@@ -4,7 +4,8 @@ import SwiftData
 import UserNotifications
 import WidgetKit
 
-/// Schedules local notifications for reminders and handles their actions.
+/// Schedules local notifications for tasks and handles their actions.
+/// Reminder tasks repeat until done; plain tasks get one notification at their due date.
 @Observable
 final class NotificationService: NSObject {
     static let shared = NotificationService()
@@ -19,7 +20,7 @@ final class NotificationService: NSObject {
     private static let maxPendingRequests = 64
 
     /// Set when the user taps a notification; the root view opens the matching detail.
-    var reminderToOpen: UUID?
+    var taskToOpen: UUID?
 
     @ObservationIgnored private var modelContainer: ModelContainer?
     @ObservationIgnored private let center = UNUserNotificationCenter.current()
@@ -59,8 +60,8 @@ final class NotificationService: NSObject {
 
     // MARK: - Scheduling
 
-    /// Replaces the notifications of a reminder; schedules nothing unless it is pending.
-    func schedule(_ reminder: Reminder) {
+    /// Replaces the notifications of a task; schedules nothing unless it is pending and dated.
+    func schedule(_ reminder: TaskItem) {
         cancel(reminder)
         defer { refreshWidget() }
         guard reminder.status == .pending else { return }
@@ -69,8 +70,8 @@ final class NotificationService: NSObject {
         }
     }
 
-    /// Removes pending and delivered notifications of a reminder.
-    func cancel(_ reminder: Reminder) {
+    /// Removes pending and delivered notifications of a task.
+    func cancel(_ reminder: TaskItem) {
         cancel(reminderID: reminder.id)
     }
 
@@ -81,15 +82,15 @@ final class NotificationService: NSObject {
     }
 
     /// Changes the status and keeps notifications in sync.
-    func setStatus(_ status: ReminderStatus, for reminder: Reminder) {
+    func setStatus(_ status: ReminderStatus, for reminder: TaskItem) {
         syncSentCount(for: reminder, now: .now)
         reminder.status = status
         schedule(reminder)
         try? reminder.modelContext?.save()
     }
 
-    /// Cancels the notifications of a reminder, then deletes it from the store.
-    func delete(_ reminder: Reminder) {
+    /// Cancels the notifications of a task, then deletes it from the store.
+    func delete(_ reminder: TaskItem) {
         cancel(reminder)
         guard let context = reminder.modelContext else { return }
         context.delete(reminder)
@@ -111,34 +112,41 @@ final class NotificationService: NSObject {
         refreshWidget()
     }
 
-    /// Publishes the upcoming pending reminders to the lock screen widget.
+    /// Publishes the upcoming pending reminders (not plain tasks) to the lock screen widget.
     private func refreshWidget() {
         let now = Date.now
         let upcoming = pendingReminders()
-            .filter { $0.dueDate > now }
-            .sorted { $0.dueDate < $1.dueDate }
+            .filter(\.isReminder)
+            .compactMap { task in task.dueDate.map { (task, $0) } }
+            .filter { $0.1 > now }
+            .sorted { $0.1 < $1.1 }
             .prefix(20)
-            .map { WidgetSnapshot.Item(id: $0.id, title: $0.title, dueDate: $0.dueDate) }
+            .map { WidgetSnapshot.Item(id: $0.0.id, title: $0.0.title, dueDate: $0.1) }
         WidgetSnapshot(upcoming: Array(upcoming)).save()
         WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.nextReminder)
     }
 
-    /// Fire dates of the first notification and its follow-ups.
-    func fireDates(for reminder: Reminder) -> [Date] {
-        guard let interval = reminder.repeatInterval.duration else { return [reminder.dueDate] }
-        return (0...Self.maxFollowUps).map { reminder.dueDate.addingTimeInterval(Double($0) * interval) }
+    /// Fire dates of the first notification and, for reminders, its follow-ups.
+    func fireDates(for reminder: TaskItem) -> [Date] {
+        guard let dueDate = reminder.dueDate else { return [] }
+        guard reminder.isReminder, let interval = reminder.repeatInterval.duration else { return [dueDate] }
+        return (0...Self.maxFollowUps).map { dueDate.addingTimeInterval(Double($0) * interval) }
     }
 
-    private func requests(for reminder: Reminder, after now: Date) -> [(date: Date, request: UNNotificationRequest)] {
+    private func requests(for reminder: TaskItem, after now: Date) -> [(date: Date, request: UNNotificationRequest)] {
         let dates = fireDates(for: reminder)
         return dates.enumerated().compactMap { index, date in
             guard date > now else { return nil }
 
             let content = UNMutableNotificationContent()
-            content.title = "Rappel"
+            content.title = reminder.isReminder ? "Rappel" : "Tâche"
             content.body = reminder.title
-            if let subtitle = Self.subtitle(index: index, lastIndex: dates.count - 1, interval: reminder.repeatInterval) {
-                content.subtitle = subtitle
+            if reminder.isReminder {
+                if let subtitle = Self.subtitle(index: index, lastIndex: dates.count - 1, interval: reminder.repeatInterval) {
+                    content.subtitle = subtitle
+                }
+            } else if let space = reminder.space {
+                content.subtitle = space.displayPath
             }
             content.sound = .default
             content.categoryIdentifier = Self.categoryIdentifier
@@ -176,14 +184,14 @@ final class NotificationService: NSObject {
         try? modelContainer?.mainContext.save()
     }
 
-    private func syncSentCount(for reminder: Reminder, now: Date) {
+    private func syncSentCount(for reminder: TaskItem, now: Date) {
         guard reminder.status == .pending else { return }
         // Dates before creation were never scheduled.
         let delivered = fireDates(for: reminder).filter { $0 >= reminder.createdAt && $0 <= now }.count
         markSent(reminder, count: delivered)
     }
 
-    private func markSent(_ reminder: Reminder, count: Int) {
+    private func markSent(_ reminder: TaskItem, count: Int) {
         if count > reminder.remindersSent {
             reminder.remindersSent = count
         }
@@ -191,17 +199,18 @@ final class NotificationService: NSObject {
 
     // MARK: - Store access
 
-    func reminder(with id: UUID) -> Reminder? {
+    func task(with id: UUID) -> TaskItem? {
         guard let context = modelContainer?.mainContext else { return nil }
-        var descriptor = FetchDescriptor<Reminder>(predicate: #Predicate { $0.id == id })
+        var descriptor = FetchDescriptor<TaskItem>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
     }
 
-    private func pendingReminders() -> [Reminder] {
+    /// Pending tasks, reminders or not.
+    private func pendingReminders() -> [TaskItem] {
         guard let context = modelContainer?.mainContext else { return [] }
         // Enum predicates are not supported by SwiftData, filter in memory.
-        let all = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
+        let all = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
         return all.filter { $0.status == .pending }
     }
 
@@ -233,14 +242,14 @@ final class NotificationService: NSObject {
     }
 
     fileprivate func recordDelivery(of target: Target?) {
-        guard let target, let reminder = reminder(with: target.id), reminder.status == .pending else { return }
+        guard let target, let reminder = task(with: target.id), reminder.status == .pending else { return }
         markSent(reminder, count: target.index + 1)
         try? reminder.modelContext?.save()
     }
 
     fileprivate func handleResponse(action: String, target: Target?) {
         guard let target else { return }
-        let reminder = reminder(with: target.id)
+        let reminder = task(with: target.id)
         if let reminder, reminder.status == .pending {
             markSent(reminder, count: target.index + 1)
         }
@@ -254,7 +263,7 @@ final class NotificationService: NSObject {
             }
         case UNNotificationDefaultActionIdentifier:
             // The root view opens the detail, or stays on the day view if the reminder is gone.
-            reminderToOpen = target.id
+            taskToOpen = target.id
         default:
             break
         }

@@ -3,19 +3,30 @@ import FoundationModels
 import Observation
 
 /// Result of parsing a dictated sentence.
-nonisolated struct ParsedReminder: Sendable, Equatable {
+nonisolated struct ParsedCapture: Sendable, Equatable {
     enum Engine: Sendable {
         case foundationModels
         case fallback
     }
 
+    var intent: CaptureIntent
     var title: String
-    /// nil when the sentence expresses no date: the user is asked instead of guessing.
+    /// nil when the sentence expresses no date: a reminder then asks the user instead of guessing.
     var dueDate: Date?
     /// nil when the sentence does not ask for a repeat: the default from Settings applies.
     var repeatInterval: RepeatInterval?
     var confidence: Double
+    /// Most likely spaces, best first; empty when nothing fits.
+    var spaceGuesses: [SpaceGuess]
     var engine: Engine
+
+    /// The space to file the item in, only when the best guess clears the threshold.
+    var space: SpaceRef? {
+        guard let best = spaceGuesses.first, best.confidence >= SpaceRouter.threshold else { return nil }
+        return best.space
+    }
+
+    var spaceConfidence: Double { spaceGuesses.first?.confidence ?? 0 }
 }
 
 extension Calendar {
@@ -29,7 +40,7 @@ extension Calendar {
     }()
 }
 
-/// Text -> ParsedReminder, on-device only. Uses Foundation Models when Apple Intelligence is
+/// Text -> ParsedCapture (intent, title, date, repeat, space), on-device only. Uses Foundation Models when Apple Intelligence is
 /// available, otherwise a small rule-based French parser. Never calls a cloud API.
 @Observable
 final class ParserService {
@@ -54,21 +65,21 @@ final class ParserService {
         }
     }
 
-    func parse(_ text: String, now: Date = .now) async -> ParsedReminder {
-        let fallback = FallbackParser(now: now).parse(text)
-        guard isModelAvailable else { return fallback.reminder }
+    func parse(_ text: String, spaces: [SpaceRef] = [], now: Date = .now) async -> ParsedCapture {
+        let fallback = FallbackParser(now: now, spaces: spaces).parse(text)
+        guard isModelAvailable else { return fallback.capture }
         do {
-            let session = LanguageModelSession(instructions: Self.instructions(now: now))
+            let session = LanguageModelSession(instructions: Self.instructions(now: now, spaces: spaces))
             let response = try await session.respond(
                 to: text,
-                generating: GeneratedReminder.self,
+                generating: GeneratedCapture.self,
                 options: GenerationOptions(sampling: .greedy)
             )
-            return Self.merge(response.content, fallback: fallback)
+            return Self.merge(response.content, fallback: fallback, spaces: spaces)
         } catch {
             // Degrade to the rule-based parser for this sentence.
             recordFailure(error)
-            return fallback.reminder
+            return fallback.capture
         }
     }
 
@@ -87,17 +98,37 @@ final class ParserService {
 
     /// Model output first; deterministic arithmetic wins for "dans X minutes", and the
     /// rule-based date fills in when the model returns none.
-    private static func merge(_ generated: GeneratedReminder, fallback: FallbackParser.Output) -> ParsedReminder {
+    /// Space paths the model returns are matched back to real spaces; unknown ones are dropped,
+    /// and the keyword guesses are used when the model returns none.
+    private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef]) -> ParsedCapture {
+        let base = fallback.capture
         let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelDate = Self.date(from: generated.dueDate)
-        let dueDate = fallback.isRelativeOffset ? fallback.reminder.dueDate : (modelDate ?? fallback.reminder.dueDate)
-        return ParsedReminder(
-            title: title.isEmpty ? fallback.reminder.title : title,
+        let dueDate = fallback.isRelativeOffset ? base.dueDate : (modelDate ?? base.dueDate)
+        var guesses: [SpaceGuess] = []
+        for guess in generated.spaces {
+            guard let space = Self.space(matching: guess.path, in: spaces), !guesses.contains(where: { $0.space.id == space.id }) else { continue }
+            guesses.append(SpaceGuess(space: space, confidence: min(max(guess.confidence, 0), 1)))
+        }
+        guesses.sort { $0.confidence > $1.confidence }
+        return ParsedCapture(
+            intent: generated.intent.intent,
+            title: title.isEmpty ? base.title : title,
             dueDate: dueDate,
-            repeatInterval: generated.repeatInterval.repeatInterval ?? fallback.reminder.repeatInterval,
+            repeatInterval: generated.repeatInterval.repeatInterval ?? base.repeatInterval,
             confidence: min(max(generated.confidence, 0), 1),
+            spaceGuesses: guesses.isEmpty ? base.spaceGuesses : Array(guesses.prefix(3)),
             engine: .foundationModels
         )
+    }
+
+    /// Exact path first ("Études > Finance"), then a unique last component ("Finance").
+    private static func space(matching path: String, in spaces: [SpaceRef]) -> SpaceRef? {
+        let key = SpaceRouter.normalize(path)
+        guard !key.isEmpty else { return nil }
+        if let exact = spaces.first(where: { SpaceRouter.normalize($0.modelPath) == key }) { return exact }
+        let byName = spaces.filter { SpaceRouter.normalize($0.name) == key }
+        return byName.count == 1 ? byName[0] : nil
     }
 
     private static func date(from string: String) -> Date? {
@@ -108,7 +139,7 @@ final class ParserService {
         return formatter.date(from: string.trimmingCharacters(in: .whitespaces))
     }
 
-    static func instructions(now: Date) -> String {
+    static func instructions(now: Date, spaces: [SpaceRef] = []) -> String {
         let calendar = Calendar.paris
         let dayFormat = Date.FormatStyle(date: .complete, time: .omitted, locale: calendar.locale ?? .app, calendar: calendar, timeZone: calendar.timeZone)
         let isoDay = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day()
@@ -124,9 +155,10 @@ final class ParserService {
             }
             return "- \(label) : \(day.formatted(dayFormat)) = \(day.formatted(isoDay))"
         }.joined(separator: "\n")
+        let spaceList = spaces.isEmpty ? "(aucun)" : spaces.map { "- \($0.modelPath)" }.joined(separator: "\n")
 
         return """
-        Tu extrais un rappel d'une phrase dictée en français. Réponds uniquement avec les champs demandés.
+        Tu analyses une phrase dictée en français pour créer un rappel ou une tâche. Réponds uniquement avec les champs demandés.
         Maintenant : \(now.formatted(dayFormat)), \(time), heure de Paris.
         Jours de référence :
         \(days)
@@ -140,6 +172,13 @@ final class ParserService {
           Si la phrase n'exprime aucune date ni heure, dueDate est une chaîne vide. N'invente jamais de date.
         - repeatInterval : seulement si la phrase demande une relance (« toutes les 5 minutes », « toutes les heures »…), sinon unspecified.
         - confidence : ta confiance dans l'extraction, entre 0 et 1.
+        - intent : reminder pour un rappel à heure précise avec relances (« rappelle-moi », « n'oublie pas de me », une relance demandée, un appel à une heure donnée).
+          task pour une chose à faire (« il faut que », « je dois », « à rendre », un devoir, « relancer quelqu'un », préparer, finir, réviser), souvent sans heure précise.
+        - spaces : jusqu'à 3 espaces les plus probables parmi la liste ci-dessous, du plus probable au moins probable.
+          Recopie le chemin exactement tel qu'il est écrit. Donne pour chacun une confiance entre 0 et 1.
+          Préfère le sous-espace le plus précis. Si aucun espace ne correspond clairement, renvoie une liste vide.
+        Espaces :
+        \(spaceList)
         """
     }
 }
@@ -148,8 +187,11 @@ final class ParserService {
 
 // Date is not a Generable type: the model writes an ISO string that is parsed afterwards.
 @Generable
-nonisolated struct GeneratedReminder {
-    @Guide(description: "L'action à faire, courte, sans « rappelle-moi de », sans date ni relance")
+nonisolated struct GeneratedCapture {
+    @Guide(description: "reminder pour un rappel avec relances, task pour une chose à faire")
+    var intent: GeneratedIntent
+
+    @Guide(description: "L'action à faire, courte, sans « rappelle-moi de » ni « il faut que je », sans date ni relance")
     var title: String
 
     @Guide(description: "Date et heure absolues au format AAAA-MM-JJTHH:MM (heure de Paris), ou chaîne vide si la phrase n'exprime ni date ni heure")
@@ -160,6 +202,32 @@ nonisolated struct GeneratedReminder {
 
     @Guide(description: "Confiance dans l'extraction, entre 0 et 1", .range(0.0...1.0))
     var confidence: Double
+
+    @Guide(description: "Jusqu'à 3 espaces probables, chemin recopié de la liste, du plus probable au moins probable", .maximumCount(3))
+    var spaces: [GeneratedSpaceGuess]
+}
+
+@Generable
+nonisolated struct GeneratedSpaceGuess {
+    @Guide(description: "Chemin exact de l'espace, par exemple « Études > Finance »")
+    var path: String
+
+    @Guide(description: "Confiance que la phrase appartient à cet espace, entre 0 et 1", .range(0.0...1.0))
+    var confidence: Double
+}
+
+/// Session and goal intents (steps 6b / 6c) are not offered to the model yet.
+@Generable
+nonisolated enum GeneratedIntent {
+    case reminder
+    case task
+
+    var intent: CaptureIntent {
+        switch self {
+        case .reminder: .reminder
+        case .task: .task
+        }
+    }
 }
 
 @Generable

@@ -1,35 +1,39 @@
 import SwiftUI
 
-struct ReminderCard: View {
-    let reminder: Reminder
+/// Dated task in the day and month lists. The bar between time and title takes the colour
+/// of the task's space; tasks without a space stay neutral.
+struct TaskCard: View {
+    let item: TaskItem
 
-    private var isCancelled: Bool { reminder.status == .cancelled }
+    private var isCancelled: Bool { item.status == .cancelled }
 
     private var subtitle: String {
-        switch reminder.status {
-        case .done: return "Fait"
-        case .cancelled: return "Annulé"
-        case .pending:
-            if reminder.repeatInterval == .none { return "Sans relance" }
-            return "Relance \(reminder.repeatInterval.label.lowercased())"
+        let state: String = switch item.status {
+        case .done: "Fait"
+        case .cancelled: "Annulé"
+        case .pending where !item.isReminder: "À faire"
+        case .pending where item.repeatInterval == .none: "Sans relance"
+        case .pending: "Relance \(item.repeatInterval.label.lowercased())"
         }
+        guard let space = item.space else { return state }
+        return "\(space.displayPath) · \(state)"
     }
 
     var body: some View {
         GlassCard(padding: 14) {
             HStack(spacing: 12) {
-                Text(reminder.dueDate.formatted(.dateTime.hour().minute().locale(.app)))
+                Text(item.dueDate?.formatted(.dateTime.hour().minute().locale(.app)) ?? "—")
                     .font(.system(size: 17, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(isCancelled ? Palette.secondary : Palette.text)
                     .frame(width: 50, alignment: .leading)
 
-                Rectangle()
-                    .fill(Palette.secondary.opacity(0.25))
-                    .frame(width: 1, height: 34)
+                Capsule()
+                    .fill(item.space?.color ?? Palette.secondary.opacity(0.25))
+                    .frame(width: item.space == nil ? 1 : 3, height: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(reminder.title)
+                    Text(item.title)
                         .font(.system(size: 16, weight: .semibold))
                         .strikethrough(isCancelled)
                         .foregroundStyle(isCancelled ? Palette.secondary : Palette.text)
@@ -37,6 +41,7 @@ struct ReminderCard: View {
                     Text(subtitle)
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.secondary)
+                        .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
@@ -49,8 +54,9 @@ struct ReminderCard: View {
     }
 
     private var statusBadge: some View {
-        let style: (symbol: String, foreground: Color, background: Color, label: String) = switch reminder.status {
-        case .pending: ("arrow.clockwise", Palette.secondary, Palette.text.opacity(0.06), "En attente")
+        let style: (symbol: String, foreground: Color, background: Color, label: String) = switch item.status {
+        case .pending where item.isReminder: ("arrow.clockwise", Palette.secondary, Palette.text.opacity(0.06), "Rappel en attente")
+        case .pending: ("circle", Palette.secondary, Palette.text.opacity(0.06), "À faire")
         case .done: ("checkmark", .white, Palette.green, "Fait")
         case .cancelled: ("xmark", Palette.secondary, Palette.text.opacity(0.06), "Annulé")
         }

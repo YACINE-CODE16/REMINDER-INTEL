@@ -4,16 +4,23 @@ import SwiftData
 struct DayView: View {
     @Binding var selectedDate: Date
     var onShowCalendar: () -> Void
+    var onShowSettings: () -> Void
     /// The detail sheet is owned by the root view, so a deep link can close it.
-    var onSelect: (Reminder) -> Void
+    var onSelect: (TaskItem) -> Void
 
-    @Query(sort: \Reminder.dueDate) private var reminders: [Reminder]
-    @State private var reminderToDelete: Reminder?
+    @Query private var tasks: [TaskItem]
+    @State private var reminderToDelete: TaskItem?
 
     private let calendar = Calendar.app
 
-    private var dayReminders: [Reminder] {
-        reminders.filter { calendar.isDate($0.dueDate, inSameDayAs: selectedDate) }
+    /// Dated tasks of the selected day, by time. Undated tasks live in their space.
+    private var dayReminders: [TaskItem] {
+        tasks.filter { $0.dueDate.map { calendar.isDate($0, inSameDayAs: selectedDate) } ?? false }
+            .sorted(by: TaskItem.byDueDate)
+    }
+
+    private func hasTasks(on day: Date) -> Bool {
+        tasks.contains { $0.dueDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false }
     }
 
     var body: some View {
@@ -45,19 +52,28 @@ struct DayView: View {
                     .foregroundStyle(Palette.text)
             }
             Spacer()
-            Button(action: onShowCalendar) {
-                Image(systemName: "calendar")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(Palette.text)
-                    .frame(width: 48, height: 48)
-                    .contentShape(.circle)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    headerButton(systemImage: "calendar", label: "Calendrier", action: onShowCalendar)
+                    headerButton(systemImage: "gearshape", label: "Réglages", action: onShowSettings)
+                }
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
-            .glassRim(.circle)
-            .accessibilityLabel("Calendrier")
         }
         .padding(.horizontal, 20)
+    }
+
+    private func headerButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(Palette.text)
+                .frame(width: 48, height: 48)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
+        .glassRim(.circle)
+        .accessibilityLabel(label)
     }
 
     // MARK: - Day selector
@@ -76,7 +92,7 @@ struct DayView: View {
     private func dayButton(_ day: Date) -> some View {
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day)
-        let hasReminders = reminders.contains { calendar.isDate($0.dueDate, inSameDayAs: day) }
+        let hasReminders = hasTasks(on: day)
         let shape = RoundedRectangle(cornerRadius: 20)
 
         return Button {
@@ -127,7 +143,7 @@ struct DayView: View {
                 Button {
                     onSelect(reminder)
                 } label: {
-                    ReminderCard(reminder: reminder)
+                    TaskCard(item: reminder)
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
@@ -183,13 +199,13 @@ struct DayView: View {
         }
     }
 
-    private func setStatus(_ status: ReminderStatus, for reminder: Reminder) {
+    private func setStatus(_ status: ReminderStatus, for reminder: TaskItem) {
         withAnimation(.appSpring) { NotificationService.shared.setStatus(status, for: reminder) }
     }
 }
 
 #Preview {
-    DayView(selectedDate: .constant(.now), onShowCalendar: {}, onSelect: { _ in })
+    DayView(selectedDate: .constant(.now), onShowCalendar: {}, onShowSettings: {}, onSelect: { _ in })
         .background(AppBackground())
-        .modelContainer(for: Reminder.self, inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
 }

@@ -3,7 +3,8 @@ import SwiftUI
 enum AppTab: CaseIterable, Identifiable {
     case day
     case month
-    case settings
+    case spaces
+    case tracking
 
     var id: Self { self }
 
@@ -11,7 +12,8 @@ enum AppTab: CaseIterable, Identifiable {
         switch self {
         case .day: "Jour"
         case .month: "Calendrier"
-        case .settings: "Réglages"
+        case .spaces: "Espaces"
+        case .tracking: "Suivi"
         }
     }
 
@@ -19,7 +21,8 @@ enum AppTab: CaseIterable, Identifiable {
         switch self {
         case .day: "list.bullet"
         case .month: "calendar"
-        case .settings: "gearshape"
+        case .spaces: "square.grid.2x2"
+        case .tracking: "chart.bar"
         }
     }
 }
@@ -82,7 +85,7 @@ struct FloatingTabBar: View {
             Image(systemName: tab.systemImage)
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(isSelected ? .white : Palette.text)
-                .frame(width: 52, height: 52)
+                .frame(width: 50, height: 50)
                 .background {
                     if isSelected {
                         Circle()

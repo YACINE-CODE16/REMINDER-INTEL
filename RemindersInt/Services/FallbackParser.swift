@@ -2,16 +2,21 @@ import Foundation
 
 /// Minimal rule-based French parser, used when Apple Intelligence is unavailable.
 /// Handles "dans X min/heures", "aujourd'hui / demain / après-demain / lundi…",
-/// "ce matin / ce soir", "à 16h30 / à midi" and "toutes les X minutes / heures".
+/// "ce matin / ce soir", "à 16h30 / à midi" and "toutes les X minutes / heures",
+/// plus keyword-based intent and space routing.
 nonisolated struct FallbackParser {
     struct Output {
-        var reminder: ParsedReminder
+        var capture: ParsedCapture
         /// True for "dans X minutes" style dates, computed exactly from now.
         var isRelativeOffset: Bool
     }
 
     let now: Date
+    var spaces: [SpaceRef] = []
     var calendar: Calendar = .paris
+
+    private static let reminderMarkers = #"rappelle[- ]?moi|n['’]oublie pas|fais[- ]moi penser|relance[- ]moi|\brappel\b"#
+    private static let taskMarkers = #"il faut que|il faudrait|faut que je|je dois|[àa] rendre|\bdevoirs?\b|\brelancer\b|[àa] faire|\bfinir\b|\bterminer\b|\bpr[ée]parer\b|\br[ée]viser\b"#
 
     private static let numbers: [String: Int] = [
         "un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6, "sept": 7,
@@ -94,14 +99,33 @@ nonisolated struct FallbackParser {
         }
 
         let dueDate = resolveDate(minutesOffset: minutesOffset, dayOffset: dayOffset, hour: hour ?? partOfDayHour, minute: minute)
-        let reminder = ParsedReminder(
+        let intent = Self.intent(
+            of: text,
+            hasRepeat: repeatInterval != nil,
+            hasExplicitTime: hour != nil || minutesOffset != nil
+        )
+        let capture = ParsedCapture(
+            intent: intent,
             title: Self.cleanTitle(rest),
             dueDate: dueDate,
             repeatInterval: repeatInterval,
             confidence: dueDate == nil ? 0.3 : 0.6,
+            spaceGuesses: SpaceRouter(spaces: spaces).route(text),
             engine: .fallback
         )
-        return Output(reminder: reminder, isRelativeOffset: minutesOffset != nil)
+        return Output(capture: capture, isRelativeOffset: minutesOffset != nil)
+    }
+
+    /// "Rappelle-moi" or a repeat → reminder; "il faut que", "à rendre", "relancer"… → task;
+    /// otherwise a precise time means a reminder, anything else a task.
+    static func intent(of text: String, hasRepeat: Bool, hasExplicitTime: Bool) -> CaptureIntent {
+        if text.range(of: reminderMarkers, options: [.regularExpression, .caseInsensitive]) != nil || hasRepeat {
+            return .reminder
+        }
+        if text.range(of: taskMarkers, options: [.regularExpression, .caseInsensitive]) != nil {
+            return .task
+        }
+        return hasExplicitTime ? .reminder : .task
     }
 
     private func resolveDate(minutesOffset: Int?, dayOffset: Int?, hour: Int?, minute: Int?) -> Date? {
@@ -153,7 +177,7 @@ nonisolated struct FallbackParser {
 
     private static func cleanTitle(_ text: String) -> String {
         var title = text
-        let leading = #"^\s*(?:rappelle[- ]moi|rappel|n['’]oublie pas|pense|il faut que je|je dois)\s*(?:de\s+|d['’]|à\s+|qu['’]|que\s+)?"#
+        let leading = #"^\s*(?:rappelle[- ]moi|rappel|n['’]oublie pas|fais[- ]moi penser|pense|il faut que je|il faudrait que je|faut que je|je dois)\s*(?:de\s+|d['’]|à\s+|qu['’]|que\s+)?"#
         if let regex = try? NSRegularExpression(pattern: leading, options: [.caseInsensitive]) {
             title = regex.stringByReplacingMatches(in: title, range: NSRange(title.startIndex..., in: title), withTemplate: "")
         }

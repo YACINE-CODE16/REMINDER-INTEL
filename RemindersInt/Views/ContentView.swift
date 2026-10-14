@@ -10,12 +10,18 @@ struct ContentView: View {
 
     @State private var selectedTab: AppTab = .day
     @State private var selectedDate = Calendar.app.startOfDay(for: .now)
+    @State private var spacesPath: [Space] = []
     @State private var isAddingReminder = false
+    @State private var isShowingSettings = false
     @State private var isCapturingVoice = false
     @State private var voiceDraft: VoiceDraft?
     @State private var pendingVoiceDraft: VoiceDraft?
-    @State private var toastMessage: String?
-    @State private var detailReminder: Reminder?
+    @State private var captureOutcome: CaptureOutcome?
+    @State private var spacePickerItem: TaskItem?
+    @State private var detailItem: TaskItem?
+    #if DEBUG
+    @State private var debugDictation: String?
+    #endif
 
     private let notifications = NotificationService.shared
     private let captureRequests = VoiceCaptureRequests.shared
@@ -37,11 +43,7 @@ struct ContentView: View {
 
                 VStack {
                     Spacer()
-                    VoiceCaptureView(
-                        onCreated: { message in withAnimation { toastMessage = message } },
-                        onNeedsDate: { title, transcript in pendingVoiceDraft = VoiceDraft(title: title, transcript: transcript) },
-                        onClose: closeVoiceCapture
-                    )
+                    voiceCapture
                 }
                 .transition(.move(edge: .bottom))
             }
@@ -49,33 +51,40 @@ struct ContentView: View {
         .animation(.appSpring, value: isCapturingVoice)
         // Dark status bar text would be unreadable over the dimmed app.
         .statusBarHidden(isCapturingVoice)
-        .overlay(alignment: .top) {
-            if let toastMessage {
-                ToastView(message: toastMessage)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .task(id: toastMessage) {
-                        try? await Task.sleep(for: .seconds(2.5))
-                        withAnimation { self.toastMessage = nil }
-                    }
-            }
-        }
         .sheet(item: $voiceDraft) { draft in
-            ReminderFormView(
-                initialDate: ReminderFormView.suggestedDueDate(on: .now),
+            TaskFormView(
+                initialDate: TaskFormView.suggestedDueDate(on: .now),
                 repeatInterval: defaultRepeatInterval,
                 title: draft.title,
-                rawTranscript: draft.transcript
+                rawTranscript: draft.transcript,
+                space: draft.space
             )
         }
         .sheet(isPresented: $isAddingReminder) {
-            ReminderFormView(
-                initialDate: ReminderFormView.suggestedDueDate(on: selectedTab == .settings ? .now : selectedDate),
+            TaskFormView(
+                initialDate: TaskFormView.suggestedDueDate(on: selectedTab == .day || selectedTab == .month ? selectedDate : .now),
                 repeatInterval: defaultRepeatInterval
             )
         }
-        .sheet(item: $detailReminder) { reminder in
-            ReminderDetailView(reminder: reminder)
+        .sheet(isPresented: $isShowingSettings) {
+            NavigationStack {
+                SettingsView()
+                    .background(AppBackground())
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(role: .close) { isShowingSettings = false }
+                        }
+                    }
+            }
+        }
+        .sheet(item: $spacePickerItem) { item in
+            SpacePickerSheet(item: item) { _ in
+                captureOutcome?.proposals = []
+                restartToast()
+            }
+        }
+        .sheet(item: $detailItem) { item in
+            TaskDetailView(item: item)
         }
         .task {
             if !hasSeededDemoData {
@@ -84,9 +93,14 @@ struct ContentView: View {
                 hasSeededDemoData = true
             }
             #if DEBUG
-            applyDebugLaunchArguments()
-            #endif
+            await applyDebugLaunchArguments()
+            // Screenshots on a fresh simulator: no permission alert over the UI.
+            if !UserDefaults.standard.bool(forKey: "uiNoPrompt") {
+                await notifications.requestAuthorization()
+            }
+            #else
             await notifications.requestAuthorization()
+            #endif
             await ParserService.shared.checkModel()
             // Safety net after a reinstall or a missed update.
             notifications.rescheduleAllPending()
@@ -102,14 +116,16 @@ struct ContentView: View {
             if captureRequests.takePending() { openVoiceCapture() }
         }
         .onOpenURL(perform: handleDeepLink)
-        .onChange(of: notifications.reminderToOpen, initial: true) { _, id in
+        .onChange(of: notifications.taskToOpen, initial: true) { _, id in
             guard let id else { return }
-            notifications.reminderToOpen = nil
+            notifications.taskToOpen = nil
             selectedTab = .day
-            // A deleted reminder simply leaves the app on the day view.
-            guard let reminder = notifications.reminder(with: id) else { return }
-            selectedDate = Calendar.app.startOfDay(for: reminder.dueDate)
-            detailReminder = reminder
+            // A deleted task simply leaves the app on the day view.
+            guard let item = notifications.task(with: id) else { return }
+            if let dueDate = item.dueDate {
+                selectedDate = Calendar.app.startOfDay(for: dueDate)
+            }
+            detailItem = item
         }
     }
 
@@ -122,25 +138,73 @@ struct ContentView: View {
                 DayView(
                     selectedDate: $selectedDate,
                     onShowCalendar: { withAnimation(.appSpring) { selectedTab = .month } },
-                    onSelect: { detailReminder = $0 }
+                    onShowSettings: { isShowingSettings = true },
+                    onSelect: { detailItem = $0 }
                 )
             case .month:
                 MonthView(
                     selectedDate: $selectedDate,
                     onShowDay: { withAnimation(.appSpring) { selectedTab = .day } },
-                    onSelect: { detailReminder = $0 }
+                    onSelect: { detailItem = $0 }
                 )
-            case .settings:
-                SettingsView()
+            case .spaces:
+                SpacesHubView(path: $spacesPath, onSelectTask: { detailItem = $0 })
+            case .tracking:
+                TrackingView()
             }
         }
         .safeAreaInset(edge: .bottom) {
-            FloatingTabBar(
-                selectedTab: $selectedTab,
-                onMicrophone: { isCapturingVoice = true },
-                onManualEntry: { isAddingReminder = true }
-            )
+            VStack(spacing: 10) {
+                if let captureOutcome {
+                    CaptureToastView(
+                        outcome: captureOutcome,
+                        onPick: { file(captureOutcome.item, in: $0) },
+                        onChange: { spacePickerItem = captureOutcome.item }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: captureOutcome.id) {
+                        // Longer when a question is asked.
+                        try? await Task.sleep(for: .seconds(captureOutcome.asksForSpace ? 10 : 6))
+                        withAnimation(.appSpring) { self.captureOutcome = nil }
+                    }
+                }
+                FloatingTabBar(
+                    selectedTab: $selectedTab,
+                    onMicrophone: { isCapturingVoice = true },
+                    onManualEntry: { isAddingReminder = true }
+                )
+            }
+            .animation(.appSpring, value: captureOutcome?.id)
         }
+    }
+
+    private var voiceCapture: some View {
+        #if DEBUG
+        let autoSubmit = debugDictation
+        #else
+        let autoSubmit: String? = nil
+        #endif
+        return VoiceCaptureView(
+            onCreated: { captureOutcome = $0 },
+            onNeedsDate: { pendingVoiceDraft = $0 },
+            onClose: closeVoiceCapture,
+            autoSubmitText: autoSubmit
+        )
+    }
+
+    /// Answer to "Dans quel espace ?": files the task, then shows the confirmation.
+    private func file(_ item: TaskItem, in space: Space?) {
+        item.space = space
+        try? modelContext.save()
+        NotificationService.shared.schedule(item)
+        captureOutcome?.proposals = []
+        restartToast()
+    }
+
+    /// Gives the updated toast a fresh display time.
+    private func restartToast() {
+        guard let outcome = captureOutcome else { return }
+        captureOutcome = CaptureOutcome(item: outcome.item, transcript: outcome.transcript, proposals: outcome.proposals)
     }
 
     /// A dictation without a date continues in the form once the panel is closed.
@@ -148,25 +212,50 @@ struct ContentView: View {
         isCapturingVoice = false
         voiceDraft = pendingVoiceDraft
         pendingVoiceDraft = nil
+        #if DEBUG
+        debugDictation = nil
+        #endif
     }
 
     #if DEBUG
-    /// Screenshot helper: `-uiTab month|settings` and `-uiScreen capture|detail|form`.
-    private func applyDebugLaunchArguments() {
+    /// Screenshot and test helpers:
+    /// `-uiTab day|month|spaces|tracking|settings`, `-uiSpace <name>` (opens that space),
+    /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
+    /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
+    private func applyDebugLaunchArguments() async {
         let defaults = UserDefaults.standard
         switch defaults.string(forKey: "uiTab") {
         case "month": selectedTab = .month
-        case "settings": selectedTab = .settings
+        case "spaces": selectedTab = .spaces
+        case "tracking": selectedTab = .tracking
+        case "settings": isShowingSettings = true
         default: break
+        }
+        if let name = defaults.string(forKey: "uiSpace"),
+           let space = Space.activeTree(in: modelContext).first(where: { $0.name == name }) {
+            selectedTab = .spaces
+            var chain: [Space] = []
+            var current: Space? = space
+            while let node = current {
+                chain.insert(node, at: 0)
+                current = node.parent
+            }
+            spacesPath = chain
         }
         switch defaults.string(forKey: "uiScreen") {
         case "capture": isCapturingVoice = true
         case "form": isAddingReminder = true
         case "detail":
-            let descriptor = FetchDescriptor<Reminder>(sortBy: [SortDescriptor(\.dueDate)])
-            let reminders = (try? modelContext.fetch(descriptor)) ?? []
-            detailReminder = reminders.first { Calendar.app.isDate($0.dueDate, inSameDayAs: selectedDate) } ?? reminders.first
+            let items = ((try? modelContext.fetch(FetchDescriptor<TaskItem>())) ?? []).sorted(by: TaskItem.byDueDate)
+            detailItem = items.first { $0.dueDate.map { Calendar.app.isDate($0, inSameDayAs: selectedDate) } ?? false } ?? items.first
         default: break
+        }
+        if let phrase = defaults.string(forKey: "uiDictation") {
+            debugDictation = phrase
+            isCapturingVoice = true
+        }
+        if defaults.bool(forKey: "parserSelfTest") {
+            await ParserSelfTest.run(spaces: Space.activeTree(in: modelContext).map(\.ref))
         }
     }
     #endif
@@ -179,7 +268,7 @@ struct ContentView: View {
             openVoiceCapture()
         case "reminder":
             if let id = UUID(uuidString: url.lastPathComponent) {
-                notifications.reminderToOpen = id
+                notifications.taskToOpen = id
             }
         default:
             break
@@ -189,20 +278,23 @@ struct ContentView: View {
     /// Closes the root sheets so the capture can be presented; it starts listening on appear.
     private func openVoiceCapture() {
         isAddingReminder = false
+        isShowingSettings = false
         voiceDraft = nil
-        detailReminder = nil
+        detailItem = nil
+        spacePickerItem = nil
         isCapturingVoice = true
     }
 }
 
-/// Dictation without a date, completed in the form.
+/// Reminder dictated without a date, completed in the form.
 struct VoiceDraft: Identifiable {
     let id = UUID()
     let title: String
     let transcript: String
+    var space: Space?
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Reminder.self, inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
 }

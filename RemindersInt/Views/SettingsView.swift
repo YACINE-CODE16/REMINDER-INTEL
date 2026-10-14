@@ -98,7 +98,7 @@ struct SettingsView: View {
 
     private func completeTestReminders() {
         let title = Self.testReminderTitle
-        let descriptor = FetchDescriptor<Reminder>(predicate: #Predicate { $0.title == title })
+        let descriptor = FetchDescriptor<TaskItem>(predicate: #Predicate { $0.title == title })
         let pending = ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.status == .pending }
         for reminder in pending {
             NotificationService.shared.setStatus(.done, for: reminder)
@@ -111,7 +111,7 @@ struct SettingsView: View {
     }
 
     private func scheduleTestNotification() {
-        let reminder = Reminder(
+        let reminder = TaskItem(
             title: Self.testReminderTitle,
             dueDate: .now.addingTimeInterval(10),
             repeatInterval: .every5min
@@ -126,5 +126,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .background(AppBackground())
-        .modelContainer(for: Reminder.self, inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
 }

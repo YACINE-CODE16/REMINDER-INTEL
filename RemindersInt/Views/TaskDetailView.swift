@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-struct ReminderDetailView: View {
-    let reminder: Reminder
+struct TaskDetailView: View {
+    let item: TaskItem
 
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
@@ -13,22 +13,51 @@ struct ReminderDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(reminder.title)
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(Palette.text)
-                        .strikethrough(reminder.status == .cancelled)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let space = item.space {
+                            Label(space.displayPath, systemImage: space.sfSymbol)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(space.color)
+                        }
+                        Text(item.title)
+                            .font(.largeTitle.bold())
+                            .foregroundStyle(Palette.text)
+                            .strikethrough(item.status == .cancelled)
+                    }
 
                     GlassCard {
                         VStack(spacing: 14) {
-                            detailRow("Date", reminder.dueDate.formatted(.dateTime.weekday(.wide).day().month(.wide).year().locale(.app)))
+                            detailRow("Type", item.isReminder ? "Rappel" : "Tâche")
                             Divider()
-                            detailRow("Heure", reminder.dueDate.formatted(.dateTime.hour().minute().locale(.app)))
+                            if let dueDate = item.dueDate {
+                                detailRow("Date", dueDate.formatted(.dateTime.weekday(.wide).day().month(.wide).year().locale(.app)))
+                                Divider()
+                                detailRow("Heure", dueDate.formatted(.dateTime.hour().minute().locale(.app)))
+                            } else {
+                                detailRow("Échéance", "Sans date")
+                            }
+                            if item.isReminder {
+                                Divider()
+                                detailRow("Relance", item.repeatInterval.label)
+                                Divider()
+                                detailRow("Notifications envoyées", "\(item.remindersSent)")
+                            }
                             Divider()
-                            detailRow("Relance", reminder.repeatInterval.label)
+                            detailRow("Espace", item.space?.displayPath ?? "Aucun")
                             Divider()
-                            detailRow("Notifications envoyées", "\(reminder.remindersSent)")
-                            Divider()
-                            detailRow("Statut", reminder.status.label)
+                            detailRow("Statut", item.status.label)
+                        }
+                    }
+
+                    if let note = item.note, !note.isEmpty {
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Note")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Palette.secondary)
+                                Text(note)
+                                    .foregroundStyle(Palette.text)
+                            }
                         }
                     }
                 }
@@ -47,7 +76,7 @@ struct ReminderDetailView: View {
                 }
             }
             .sheet(isPresented: $isEditing) {
-                ReminderFormView(reminder: reminder)
+                TaskFormView(item: item)
             }
             .confirmationDialog("Supprimer ce rappel ?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
                 Button("Supprimer", role: .destructive) {
@@ -56,12 +85,12 @@ struct ReminderDetailView: View {
                 }
                 Button("Garder", role: .cancel) {}
             } message: {
-                Text("Le rappel et ses notifications seront supprimés.")
+                Text("L'élément et ses notifications seront supprimés.")
             }
         }
         // Delete once the sheet is gone, so the view never renders a deleted model.
         .onDisappear {
-            if shouldDelete { NotificationService.shared.delete(reminder) }
+            if shouldDelete { NotificationService.shared.delete(item) }
         }
     }
 
@@ -95,7 +124,7 @@ struct ReminderDetailView: View {
 
     private func statusButton(_ title: String, systemImage: String, color: Color, status: ReminderStatus) -> some View {
         Button {
-            withAnimation(.appSpring) { NotificationService.shared.setStatus(status, for: reminder) }
+            withAnimation(.appSpring) { NotificationService.shared.setStatus(status, for: item) }
             dismiss()
         } label: {
             Label(title, systemImage: systemImage)

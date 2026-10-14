@@ -5,14 +5,14 @@ struct MonthView: View {
     @Binding var selectedDate: Date
     var onShowDay: () -> Void
     /// The detail sheet is owned by the root view, so a deep link can close it.
-    var onSelect: (Reminder) -> Void
+    var onSelect: (TaskItem) -> Void
 
-    @Query(sort: \Reminder.dueDate) private var reminders: [Reminder]
+    @Query private var reminders: [TaskItem]
     @State private var displayedMonth: Date
 
     private let calendar = Calendar.app
 
-    init(selectedDate: Binding<Date>, onShowDay: @escaping () -> Void, onSelect: @escaping (Reminder) -> Void) {
+    init(selectedDate: Binding<Date>, onShowDay: @escaping () -> Void, onSelect: @escaping (TaskItem) -> Void) {
         _selectedDate = selectedDate
         self.onShowDay = onShowDay
         self.onSelect = onSelect
@@ -94,7 +94,7 @@ struct MonthView: View {
     }
 
     private var daysWithReminders: Set<Date> {
-        Set(reminders.map { calendar.startOfDay(for: $0.dueDate) })
+        Set(reminders.compactMap { $0.dueDate.map(calendar.startOfDay(for:)) })
     }
 
     private var monthGrid: some View {
@@ -150,8 +150,9 @@ struct MonthView: View {
 
     // MARK: - Selected day
 
-    private var selectedDayReminders: [Reminder] {
-        reminders.filter { calendar.isDate($0.dueDate, inSameDayAs: selectedDate) }
+    private var selectedDayReminders: [TaskItem] {
+        reminders.filter { $0.dueDate.map { calendar.isDate($0, inSameDayAs: selectedDate) } ?? false }
+            .sorted(by: TaskItem.byDueDate)
     }
 
     private var selectedDaySection: some View {
@@ -177,7 +178,7 @@ struct MonthView: View {
                     Button {
                         onSelect(reminder)
                     } label: {
-                        ReminderCard(reminder: reminder)
+                        TaskCard(item: reminder)
                     }
                     .buttonStyle(.plain)
                 }
@@ -189,5 +190,5 @@ struct MonthView: View {
 #Preview {
     MonthView(selectedDate: .constant(.now), onShowDay: {}, onSelect: { _ in })
         .background(AppBackground())
-        .modelContainer(for: Reminder.self, inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
 }

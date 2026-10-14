@@ -6,12 +6,13 @@ enum Palette {
     static let secondary = Color(hex: 0x6E6E73)
     static let green = Color(hex: 0x34C759)
     static let red = Color(hex: 0xFF453A)
+    static let blue = Color(hex: 0x007AFF)
     static let lavender = Color(hex: 0xB9BEFF)
     static let blush = Color(hex: 0xFFC9DC)
 }
 
 extension Color {
-    init(hex: UInt32) {
+    nonisolated init(hex: UInt32) {
         self.init(
             red: Double((hex >> 16) & 0xFF) / 255,
             green: Double((hex >> 8) & 0xFF) / 255,

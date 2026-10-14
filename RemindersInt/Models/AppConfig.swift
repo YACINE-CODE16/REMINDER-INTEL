@@ -23,4 +23,5 @@ extension Calendar {
 enum AppStorageKey {
     static let defaultRepeatInterval = "defaultRepeatInterval"
     static let hasSeededDemoData = "hasSeededDemoData"
+    static let hasSeededSpaces = "hasSeededSpaces"
 }

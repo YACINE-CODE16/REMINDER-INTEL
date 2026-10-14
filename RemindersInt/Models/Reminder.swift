@@ -59,6 +59,9 @@ nonisolated enum ReminderStatus: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Legacy V1 storage, kept only so existing stores still open.
+/// Its rows are copied into `TaskItem` on launch by `LegacyMigration`; nothing else reads it.
+/// (SwiftData cannot rename an entity, hence a copy rather than a rename.)
 @Model
 final class Reminder {
     @Attribute(.unique) var id: UUID
