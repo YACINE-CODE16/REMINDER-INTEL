@@ -169,12 +169,23 @@ struct ContentView: View {
                     CaptureToastView(
                         outcome: captureOutcome,
                         onPick: answer,
-                        onChange: { isChangingSpace = true }
+                        onChange: { isChangingSpace = true },
+                        onPickGoal: { goal in
+                            GoalMath.increment(goal)
+                            try? modelContext.save()
+                            showToast(.goalProgress(goal), from: captureOutcome)
+                        },
+                        onUndo: {
+                            guard case .goalProgress(let goal) = captureOutcome.kind else { return }
+                            GoalMath.increment(goal, by: -1)
+                            try? modelContext.save()
+                            showToast(.goalUndone(goal), from: captureOutcome)
+                        }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: captureOutcome.id) {
                         // Longer when a question is asked.
-                        try? await Task.sleep(for: .seconds(captureOutcome.asksForSpace ? 10 : 6))
+                        try? await Task.sleep(for: .seconds(captureOutcome.asksQuestion ? 10 : 6))
                         withAnimation(.appSpring) { self.captureOutcome = nil }
                     }
                 }
@@ -260,13 +271,16 @@ struct ContentView: View {
 
     #if DEBUG
     /// Screenshot and test helpers:
-    /// `-seedDemoSessions YES` (two weeks of sessions, once), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
+    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
     /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
     /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
     private func applyDebugLaunchArguments() async {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "seedDemoSessions") {
             DemoSessions.insert(into: modelContext)
+        }
+        if defaults.bool(forKey: "seedDemoGoals") {
+            DemoGoals.insert(into: modelContext)
         }
         switch defaults.string(forKey: "uiTab") {
         case "month": selectedTab = .month
@@ -289,6 +303,10 @@ struct ContentView: View {
             }
             spacesPath = chain
         }
+        if defaults.object(forKey: "uiDayOffset") != nil {
+            let offset = defaults.integer(forKey: "uiDayOffset")
+            selectedDate = Calendar.app.date(byAdding: .day, value: offset, to: Calendar.app.startOfDay(for: .now)) ?? selectedDate
+        }
         switch defaults.string(forKey: "uiScreen") {
         case "capture": isCapturingVoice = true
         case "form": isAddingReminder = true
@@ -303,6 +321,7 @@ struct ContentView: View {
         }
         if defaults.bool(forKey: "parserSelfTest") {
             await ParserSelfTest.run(spaces: Space.activeTree(in: modelContext).map(\.ref))
+            ParserSelfTest.goalChecks(in: modelContext)
         }
     }
     #endif

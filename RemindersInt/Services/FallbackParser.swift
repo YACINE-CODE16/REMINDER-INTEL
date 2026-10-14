@@ -118,7 +118,8 @@ nonisolated struct FallbackParser {
         )
         // "Je commence le DM demain" plans something: not a session starting now.
         if sessionIntent == .sessionStart, dueDate != nil { sessionIntent = nil }
-        let intent = sessionIntent ?? Self.intent(
+        let progress: CaptureIntent? = sessionIntent == nil && dueDate == nil && Self.isGoalProgress(text) ? .goalProgress : nil
+        let intent = sessionIntent ?? progress ?? Self.intent(
             of: text,
             hasRepeat: repeatInterval != nil,
             hasExplicitTime: hour != nil || minutesOffset != nil
@@ -126,8 +127,8 @@ nonisolated struct FallbackParser {
         let capture = ParsedCapture(
             intent: intent,
             title: Self.cleanTitle(rest),
-            dueDate: intent == .sessionStart || intent == .sessionStop ? nil : dueDate,
-            repeatInterval: intent.isSession ? nil : repeatInterval,
+            dueDate: intent == .sessionStart || intent == .sessionStop || intent == .goalProgress ? nil : dueDate,
+            repeatInterval: intent.isSession || intent == .goalProgress ? nil : repeatInterval,
             duration: duration,
             confidence: dueDate == nil ? 0.3 : 0.6,
             spaceGuesses: SpaceRouter(spaces: spaces).route(text),
@@ -139,6 +140,13 @@ nonisolated struct FallbackParser {
     private static let startMarkers = #"\bje commence\b|\bje me mets\b|\bje m['’]y mets\b|\bje d[ée]marre\b|\bc['’]est parti\b|\bje m['’]attaque\b|\bje lance (?:une|la|le) (?:session|chrono)"#
     private static let stopMarkers = #"^\s*(?:stop|j['’]arr[êe]te|je m['’]arr[êe]te|j['’]ai fini|j['’]ai termin[ée]|fini|termin[ée]|c['’]est fini|fin de (?:la )?session|je fais une pause|pause)\b"#
     private static let logMarkers = #"\bj['’]ai\s+(?:fait|bossé|bosse|travaillé|révisé|étudié|passé|couru|joué|lu|codé)\b"#
+
+    private static let progressMarkers = #"\bune? (?:\p{L}+ )?de plus\b|\bencore une?\b|\bj['’]ai sign[ée]\b|\bs[ée]ance faite\b|\bplus une?\b|\+ ?1\b"#
+
+    /// "Un club de plus", "séance faite", "j'ai signé un club", "encore un".
+    static func isGoalProgress(_ text: String) -> Bool {
+        text.range(of: progressMarkers, options: [.regularExpression, .caseInsensitive]) != nil
+    }
 
     /// Session sentences: start / stop / past log. Nil for anything else.
     static func sessionIntent(of text: String) -> CaptureIntent? {

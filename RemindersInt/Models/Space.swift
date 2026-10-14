@@ -16,6 +16,7 @@ final class Space {
     @Relationship(deleteRule: .cascade, inverse: \Space.parent) var children: [Space] = []
     @Relationship(deleteRule: .nullify, inverse: \TaskItem.space) var tasks: [TaskItem] = []
     @Relationship(deleteRule: .cascade, inverse: \Session.space) var sessions: [Session] = []
+    @Relationship(deleteRule: .cascade, inverse: \Goal.space) var goals: [Goal] = []
 
     init(
         id: UUID = UUID(),
@@ -60,6 +61,11 @@ final class Space {
     /// This space and all its non-archived descendants.
     var subtree: [Space] {
         [self] + sortedChildren.flatMap(\.subtree)
+    }
+
+    /// Active goals of this space and of its descendants.
+    var subtreeGoals: [Goal] {
+        subtree.flatMap(\.goals).filter { !$0.isArchived }
     }
 
     /// Tasks of this space and of its descendants.

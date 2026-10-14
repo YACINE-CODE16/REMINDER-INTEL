@@ -19,6 +19,21 @@ struct TaskCard: View {
         return "\(space.displayPath) · \(state)"
     }
 
+    /// The task's space (or an ancestor) has an outcome goal due within 7 days.
+    private var hasUpcomingOutcome: Bool {
+        let now = Date.now
+        let limit = now.addingTimeInterval(7 * 86_400)
+        var current = item.space
+        while let space = current {
+            if space.goals.contains(where: { goal in
+                goal.kind == .outcome && !goal.isArchived && !goal.isAchieved
+                    && (goal.deadline.map { $0 >= Calendar.app.startOfDay(for: now) && $0 <= limit } ?? false)
+            }) { return true }
+            current = space.parent
+        }
+        return false
+    }
+
     var body: some View {
         GlassCard(padding: 14) {
             HStack(spacing: 12) {
@@ -38,10 +53,21 @@ struct TaskCard: View {
                         .strikethrough(isCancelled)
                         .foregroundStyle(isCancelled ? Palette.secondary : Palette.text)
                         .lineLimit(2)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Palette.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.secondary)
+                            .lineLimit(1)
+                        if hasUpcomingOutcome {
+                            Text("Objectif")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(item.space?.color ?? Palette.secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((item.space?.color ?? Palette.secondary).opacity(0.14), in: .capsule)
+                                .fixedSize()
+                        }
+                    }
                 }
 
                 Spacer(minLength: 8)

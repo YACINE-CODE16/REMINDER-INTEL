@@ -11,6 +11,7 @@ struct StatsView: View {
     }
 
     @Query(sort: \Session.startedAt) private var sessions: [Session]
+    @Query private var goals: [Goal]
     @State private var range: Range = .week
 
     private let calendar = Calendar.app
@@ -40,7 +41,12 @@ struct StatsView: View {
                     dailyCard(period: period, now: now)
                     HStack(spacing: 12) {
                         streakTile(now: now)
-                        objectivesTile
+                        NavigationLink {
+                            GoalsOverview()
+                        } label: {
+                            objectivesTile(period: period, now: now)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -318,16 +324,39 @@ struct StatsView: View {
         }
     }
 
-    /// Objectives arrive in step 6c.
-    private var objectivesTile: some View {
-        tile {
-            Text("Objectifs atteints")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Palette.secondary)
-            Text("— / —")
+    /// Goals measured on the displayed days: weekly / monthly goals and goals without
+    /// period are evaluated now, dated ones count when their deadline (or the moment they
+    /// were achieved) falls in the range.
+    private func goalsInRange(period: DateInterval) -> [Goal] {
+        goals.filter { goal in
+            guard !goal.isArchived || goal.achievedAt.map(period.contains) == true else { return false }
+            switch (goal.kind, goal.period) {
+            case (.outcome, _), (_, .untilDate):
+                if let achievedAt = goal.achievedAt, period.contains(achievedAt) { return true }
+                return goal.deadline.map { $0 >= period.start } ?? true
+            default:
+                return true
+            }
+        }
+    }
+
+    private func objectivesTile(period: DateInterval, now: Date) -> some View {
+        let relevant = goalsInRange(period: period)
+        let reached = relevant.filter { GoalMath.isAchieved($0, sessions: sessions, now: now) }.count
+        return tile {
+            HStack {
+                Text("Objectifs atteints")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.secondary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Palette.secondary)
+            }
+            Text("\(reached) / \(relevant.count)")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Palette.secondary)
-            Text("avec les objectifs")
+                .foregroundStyle(relevant.isEmpty ? Palette.secondary : Palette.text)
+            Text(relevant.isEmpty ? "aucun objectif" : "voir tous les objectifs")
                 .font(.system(size: 12))
                 .foregroundStyle(Palette.secondary)
         }

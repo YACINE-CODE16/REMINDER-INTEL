@@ -148,7 +148,14 @@ struct VoiceCaptureView: View {
                 onClose()
                 return
             }
-            // The goal intent is not produced yet (step 6c).
+            if parsed.intent == .goalProgress {
+                let goals = (try? modelContext.fetch(FetchDescriptor<Goal>())) ?? []
+                let guessed = parsed.spaceGuesses.compactMap { guess in spaces.first { $0.id == guess.space.id } }
+                onCreated(Self.handleGoalProgress(text: text, guessedSpaces: guessed, goals: goals))
+                try? modelContext.save()
+                onClose()
+                return
+            }
             let isReminder = parsed.intent == .reminder
             if isReminder, parsed.dueDate == nil {
                 onNeedsDate(VoiceDraft(title: parsed.title, transcript: text, space: space))
@@ -195,6 +202,43 @@ struct VoiceCaptureView: View {
             }
             return CaptureOutcome(kind: .sessionStarted(session), transcript: transcript, proposals: [])
         }
+    }
+
+    /// +1 on the counter goal the sentence points to: by its title or unit ("club" → "clubs"),
+    /// else by the guessed spaces, else any counter. Several candidates: the toast asks.
+    static func handleGoalProgress(text: String, guessedSpaces: [Space], goals: [Goal]) -> CaptureOutcome {
+        let candidates = goalCandidates(text: text, guessedSpaces: guessedSpaces, goals: goals)
+        switch candidates.count {
+        case 0:
+            return CaptureOutcome(kind: .goalNotFound, transcript: text, proposals: [])
+        case 1:
+            GoalMath.increment(candidates[0])
+            return CaptureOutcome(kind: .goalProgress(candidates[0]), transcript: text, proposals: [])
+        default:
+            return CaptureOutcome(kind: .goalChoice(Array(candidates.prefix(4))), transcript: text, proposals: [])
+        }
+    }
+
+    static func goalCandidates(text: String, guessedSpaces: [Space], goals: [Goal]) -> [Goal] {
+        let counters = goals.filter { $0.kind == .count && !$0.isArchived }
+        var candidates = counters.filter { mentions($0, in: text) }
+        if candidates.isEmpty {
+            for space in guessedSpaces {
+                candidates = counters.filter { goal in goal.space.map(space.contains) ?? false }
+                if !candidates.isEmpty { break }
+            }
+        }
+        return candidates.isEmpty ? counters : candidates
+    }
+
+    /// A word of 4+ letters of the goal's title or unit appears in the sentence, plural ignored.
+    private static func mentions(_ goal: Goal, in text: String) -> Bool {
+        func stems(_ string: String) -> Set<String> {
+            Set(SpaceRouter.normalize(string).split(separator: " ").map { word in
+                word.hasSuffix("s") ? String(word.dropLast()) : String(word)
+            }.filter { $0.count >= 4 })
+        }
+        return !stems(goal.title + " " + (goal.unit ?? "")).isDisjoint(with: stems(text))
     }
 
     /// The parser's guesses first, then the most used spaces, then the first roots: 3 at most.

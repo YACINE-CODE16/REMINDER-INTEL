@@ -184,6 +184,7 @@ final class ParserService {
           sessionStart quand on commence une activité maintenant (« je commence le sport », « je me mets sur la finance », « c'est parti pour les maths »).
           sessionStop quand on arrête l'activité en cours (« j'arrête », « stop », « fini », « je fais une pause »).
           sessionLog quand on raconte un temps déjà passé avec une durée (« j'ai fait 2h de maths ce matin », « hier j'ai bossé 45 min sur FieldZ »).
+          goalProgress quand on annonce une unité de plus vers un objectif compteur (« j'ai signé un club », « séance faite », « un de plus », « encore un test blanc »).
         - durationMinutes : pour sessionLog, la durée en minutes (« 2h » = 120, « 1h30 » = 90) ; 0 sinon.
           Pour sessionLog, dueDate est le début de la session si un moment est donné (« ce matin » = 09:00, « hier soir » = 19:00 la veille), sinon chaîne vide. Pour sessionStart et sessionStop, dueDate est une chaîne vide.
         - spaces : jusqu'à 3 espaces les plus probables parmi la liste ci-dessous, du plus probable au moins probable.
@@ -200,7 +201,7 @@ final class ParserService {
 // Date is not a Generable type: the model writes an ISO string that is parsed afterwards.
 @Generable
 nonisolated struct GeneratedCapture {
-    @Guide(description: "reminder pour un rappel avec relances, task pour une chose à faire, sessionStart / sessionStop / sessionLog pour le suivi du temps")
+    @Guide(description: "reminder pour un rappel avec relances, task pour une chose à faire, sessionStart / sessionStop / sessionLog pour le suivi du temps, goalProgress pour +1 sur un objectif")
     var intent: GeneratedIntent
 
     @Guide(description: "L'action à faire, courte, sans « rappelle-moi de » ni « il faut que je », sans date ni relance")
@@ -231,7 +232,6 @@ nonisolated struct GeneratedSpaceGuess {
     var confidence: Double
 }
 
-/// The goal intent (step 6c) is not offered to the model yet.
 @Generable
 nonisolated enum GeneratedIntent {
     case reminder
@@ -239,6 +239,7 @@ nonisolated enum GeneratedIntent {
     case sessionStart
     case sessionStop
     case sessionLog
+    case goalProgress
 
     var intent: CaptureIntent {
         switch self {
@@ -247,6 +248,7 @@ nonisolated enum GeneratedIntent {
         case .sessionStart: .sessionStart
         case .sessionStop: .sessionStop
         case .sessionLog: .sessionLog
+        case .goalProgress: .goalProgress
         }
     }
 }

@@ -17,6 +17,12 @@ struct CaptureOutcome: Identifiable {
         case sessionStopped(Session?)
         case sessionLogged([Session])
         case pendingSession(PendingSession)
+        /// +1 done, can be undone from the toast.
+        case goalProgress(Goal)
+        case goalUndone(Goal)
+        /// Several counters match: the toast asks which one.
+        case goalChoice([Goal])
+        case goalNotFound
     }
 
     let id = UUID()
@@ -42,8 +48,19 @@ struct CaptureOutcome: Identifiable {
     var canChangeSpace: Bool {
         switch kind {
         case .task, .sessionStarted, .sessionLogged: !asksForSpace
-        case .sessionStopped, .pendingSession: false
+        default: false
         }
+    }
+
+    /// Waits for an answer: shown longer.
+    var asksQuestion: Bool {
+        if case .goalChoice = kind { return true }
+        return asksForSpace
+    }
+
+    var canUndo: Bool {
+        if case .goalProgress = kind { return true }
+        return false
     }
 
     var currentSpace: Space? {
@@ -52,7 +69,7 @@ struct CaptureOutcome: Identifiable {
         case .sessionStarted(let session): session.space
         case .sessionLogged(let sessions): sessions.first?.space
         case .sessionStopped(let session): session?.space
-        case .pendingSession: nil
+        default: nil
         }
     }
 }
@@ -63,6 +80,8 @@ struct CaptureToastView: View {
     let outcome: CaptureOutcome
     var onPick: (Space?) -> Void
     var onChange: () -> Void
+    var onPickGoal: (Goal) -> Void = { _ in }
+    var onUndo: () -> Void = {}
 
     private static let timeStyle = Date.FormatStyle.dateTime.hour().minute().locale(.app)
 
@@ -84,6 +103,14 @@ struct CaptureToastView: View {
         case .pendingSession(let pending):
             guard pending.isLog, let end = pending.end else { return "Session · Dans quel espace ?" }
             return "\(TimeFormat.short(end.timeIntervalSince(pending.start))) à classer · Dans quel espace ?"
+        case .goalProgress(let goal):
+            return "+1 · \(goal.title)"
+        case .goalUndone(let goal):
+            return "+1 annulé · \(goal.title)"
+        case .goalChoice:
+            return "+1 · Quel objectif ?"
+        case .goalNotFound:
+            return "Aucun objectif compteur"
         }
     }
 
@@ -94,7 +121,8 @@ struct CaptureToastView: View {
         case .sessionLogged(let sessions): sessions.first.map(TimeFormat.range)
         case .pendingSession(let pending):
             pending.end.map { "\(pending.start.formatted(Self.timeStyle)) – \($0.formatted(Self.timeStyle))" }
-        case .sessionStopped: nil
+        case .goalProgress(let goal), .goalUndone(let goal): GoalMath.valueLabel(goal, sessions: [], now: .now)
+        case .sessionStopped, .goalChoice, .goalNotFound: nil
         }
         guard let prefix else { return outcome.transcript }
         return "\(prefix) · \(outcome.transcript)"
@@ -103,6 +131,9 @@ struct CaptureToastView: View {
     private var symbol: (name: String, color: Color) {
         if outcome.asksForSpace { return ("questionmark.circle.fill", .white) }
         switch outcome.kind {
+        case .goalChoice: return ("questionmark.circle.fill", .white)
+        case .goalNotFound, .goalUndone: return ("info.circle.fill", .white)
+        case .goalProgress: return ("plus.circle.fill", Palette.green)
         case .sessionStarted: return ("play.circle.fill", Palette.green)
         case .sessionStopped(let session): return session == nil ? ("info.circle.fill", .white) : ("stop.circle.fill", Palette.red)
         default: return ("checkmark.circle.fill", Palette.green)
@@ -127,7 +158,15 @@ struct CaptureToastView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)
-                if outcome.canChangeSpace {
+                if outcome.canUndo {
+                    Button("Annuler", action: onUndo)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .background(.white.opacity(0.16), in: .capsule)
+                        .buttonStyle(.plain)
+                } else if outcome.canChangeSpace {
                     Button("Changer", action: onChange)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
@@ -136,6 +175,16 @@ struct CaptureToastView: View {
                         .background(.white.opacity(0.16), in: .capsule)
                         .buttonStyle(.plain)
                 }
+            }
+            if case .goalChoice(let goals) = outcome.kind {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(goals) { goal in
+                            chip(goal.title, color: goal.space?.color) { onPickGoal(goal) }
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
             }
             if outcome.asksForSpace {
                 ScrollView(.horizontal) {

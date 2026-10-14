@@ -15,7 +15,7 @@ struct RemindersIntApp: App {
     init() {
         do {
             // Reminder stays in the schema only so V1 stores can be migrated.
-            container = try ModelContainer(for: TaskItem.self, Space.self, Session.self, Reminder.self)
+            container = try ModelContainer(for: TaskItem.self, Space.self, Session.self, Goal.self, GoalStep.self, Reminder.self)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }

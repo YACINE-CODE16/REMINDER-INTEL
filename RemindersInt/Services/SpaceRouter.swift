@@ -12,8 +12,8 @@ nonisolated enum CaptureIntent: String, Sendable, Equatable {
     case sessionStop
     /// "J'ai fait 2h de maths ce matin": records a past session.
     case sessionLog
-    /// Objective, step 6c. Not produced yet.
-    case goal
+    /// "Un club de plus", "séance faite": +1 on a counter goal.
+    case goalProgress
 
     var isSession: Bool { self == .sessionStart || self == .sessionStop || self == .sessionLog }
 }

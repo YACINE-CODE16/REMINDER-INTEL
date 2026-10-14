@@ -7,6 +7,8 @@ struct TrackingView: View {
 
     @Query(sort: \Session.startedAt) private var sessions: [Session]
     @Query private var spaces: [Space]
+    /// Observed so the weekly targets refresh.
+    @Query private var goals: [Goal]
     @State private var editedSession: Session?
     @State private var isAddingSession = false
     @State private var isPickingSpace = false
@@ -236,12 +238,23 @@ struct TrackingView: View {
                                 .font(.system(size: 15, weight: .bold))
                                 .monospacedDigit()
                                 .foregroundStyle(Palette.text)
+                            if let weekly = Self.weeklyTarget(of: entry.space) {
+                                Text("/ \(GoalMath.number(weekly))h sem.")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Palette.secondary)
+                            }
                         }
                         ProgressBar(fraction: total > 0 ? entry.seconds / total : 0, color: entry.space.color)
                     }
                 }
             }
         }
+    }
+
+    /// Sum of the weekly hours goals of a root space and its descendants.
+    static func weeklyTarget(of root: Space) -> Double? {
+        let targets = root.subtreeGoals.filter { $0.kind == .hours && $0.period == .week }.map(\.target)
+        return targets.isEmpty ? nil : targets.reduce(0, +)
     }
 
     private var sessionsHeader: some View {

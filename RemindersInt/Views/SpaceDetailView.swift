@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// One space: its direct children as chips (tap = navigate), objectives placeholder, and the
-/// tasks of the space and all its descendants by due date.
+/// One space: its direct children as chips (tap = navigate), the goals and the tasks of the
+/// space and all its descendants. A list, for the swipe actions.
 struct SpaceDetailView: View {
     let space: Space
     var onSelectTask: (TaskItem) -> Void
@@ -10,8 +10,17 @@ struct SpaceDetailView: View {
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
     @Query private var allTasks: [TaskItem]
     @Query private var allSessions: [Session]
+    @Query private var allGoals: [Goal]
     @State private var showsFinished = false
     @State private var isAddingTask = false
+    @State private var isAddingGoal = false
+    @State private var editedGoal: Goal?
+
+    /// Active goals of the subtree, most urgent first.
+    private var goals: [Goal] {
+        let active = allGoals.filter { !$0.isArchived && ($0.space.map(space.contains) ?? false) }
+        return GoalMath.sortedByUrgency(active, sessions: allSessions, now: .now)
+    }
 
     /// Tasks filed in this space or below. Queried rather than read from the relationship
     /// so status changes refresh the list.
@@ -29,19 +38,92 @@ struct SpaceDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                if !space.sortedChildren.isEmpty {
-                    chips
-                }
-                objectives
-                tasksSection
+        List {
+            header
+                .glassListRow(top: 4)
+            if !space.sortedChildren.isEmpty {
+                chips
+                    .glassListRow(bottom: 10)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+
+            sectionHeader("Objectifs") {
+                Button("Ajouter") { isAddingGoal = true }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.blue)
+                    .buttonStyle(.plain)
+            }
+            .glassListRow(top: 14)
+            if goals.isEmpty {
+                Text("Aucun objectif")
+                    .font(.callout)
+                    .foregroundStyle(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .glassListRow()
+            }
+            ForEach(goals) { goal in
+                GoalRow(goal: goal, sessions: allSessions, showsSpace: goal.space?.id != space.id) {
+                    editedGoal = goal
+                }
+                .glassListRow(top: 4, bottom: 4)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button {
+                        withAnimation(.appSpring) { goal.isArchived = true }
+                        try? goal.modelContext?.save()
+                    } label: {
+                        Label("Archiver", systemImage: "archivebox")
+                    }
+                    .tint(Palette.secondary)
+                }
+            }
+
+            sectionHeader("Tâches") {
+                Text("par échéance")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondary)
+            }
+            .glassListRow(top: 18)
+            if pending.isEmpty {
+                Text("Aucune tâche en cours")
+                    .font(.callout)
+                    .foregroundStyle(Palette.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .glassListRow()
+            }
+            ForEach(pending) { item in
+                SpaceTaskRow(item: item, rootSpace: space, onSelect: onSelectTask)
+                    .glassListRow(top: 4, bottom: 4)
+            }
+            if !finished.isEmpty {
+                Button {
+                    withAnimation(.appSpring) { showsFinished.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Terminées (\(finished.count))")
+                            .font(.subheadline.weight(.semibold))
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                            .rotationEffect(.degrees(showsFinished ? 0 : -90))
+                        Spacer()
+                    }
+                    .foregroundStyle(Palette.secondary)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .glassListRow(top: 10)
+                if showsFinished {
+                    ForEach(finished) { item in
+                        SpaceTaskRow(item: item, rootSpace: space, onSelect: onSelectTask)
+                            .glassListRow(top: 4, bottom: 4)
+                    }
+                }
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
+        .contentMargins(.bottom, 12, for: .scrollContent)
         .background(AppBackground())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -62,6 +144,12 @@ struct SpaceDetailView: View {
                 hasDueDate: false,
                 space: space
             )
+        }
+        .sheet(isPresented: $isAddingGoal) {
+            GoalFormView(space: space)
+        }
+        .sheet(item: $editedGoal) { goal in
+            GoalFormView(goal: goal)
         }
     }
 
@@ -130,73 +218,6 @@ struct SpaceDetailView: View {
         }
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
-    }
-
-    // MARK: - Objectives (step 6c)
-
-    private var objectives: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Objectifs") {
-                Button("Ajouter") {}
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Palette.blue)
-                    .disabled(true)
-                    .opacity(0.5)
-            }
-            GlassCard(padding: 14) {
-                Label("Les objectifs arrivent bientôt.", systemImage: "target")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Palette.secondary)
-            }
-        }
-    }
-
-    // MARK: - Tasks
-
-    private var tasksSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Tâches") {
-                Text("par échéance")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.secondary)
-            }
-
-            if pending.isEmpty {
-                Text("Aucune tâche en cours")
-                    .font(.callout)
-                    .foregroundStyle(Palette.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-            }
-            ForEach(pending) { item in
-                SpaceTaskRow(item: item, rootSpace: space, onSelect: onSelectTask)
-            }
-
-            if !finished.isEmpty {
-                Button {
-                    withAnimation(.appSpring) { showsFinished.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Terminées (\(finished.count))")
-                            .font(.subheadline.weight(.semibold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.bold))
-                            .rotationEffect(.degrees(showsFinished ? 0 : -90))
-                        Spacer()
-                    }
-                    .foregroundStyle(Palette.secondary)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
-
-                if showsFinished {
-                    ForEach(finished) { item in
-                        SpaceTaskRow(item: item, rootSpace: space, onSelect: onSelectTask)
-                    }
-                }
-            }
-        }
     }
 
     private func sectionHeader(_ title: String, @ViewBuilder trailing: () -> some View) -> some View {

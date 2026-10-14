@@ -12,6 +12,8 @@ struct SpacesHubView: View {
     @Query private var spaces: [Space]
     @Query private var tasks: [TaskItem]
     @Query private var sessions: [Session]
+    /// Observed so goal changes refresh the cards.
+    @Query private var goals: [Goal]
     @State private var isCreating = false
     @State private var showsArchived = false
 
@@ -250,9 +252,17 @@ struct SpaceCard: View {
         return parts.joined(separator: " · ")
     }
 
+    /// Most urgent active goal of the subtree: nearest deadline, else the most behind its period.
+    private var urgentGoal: (goal: Goal, sessions: [Session])? {
+        let sessions = space.subtree.flatMap(\.sessions)
+        guard let goal = GoalMath.sortedByUrgency(space.subtreeGoals, sessions: sessions, now: .now).first else { return nil }
+        return (goal, sessions)
+    }
+
     var body: some View {
         let overdue = counts.overdue
         GlassCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 SpaceBadge(space: space)
                 VStack(alignment: .leading, spacing: 2) {
@@ -277,6 +287,12 @@ struct SpaceCard: View {
                         .foregroundStyle(Palette.secondary)
                 }
             }
+            // Full card width under the name, so the bar keeps its length next to a badge.
+            if let urgent = urgentGoal {
+                GoalCompactLine(goal: urgent.goal, sessions: urgent.sessions)
+                    .padding(.leading, 52)
+            }
+            }
         }
         .contentShape(.rect(cornerRadius: 24))
         .accessibilityElement(children: .combine)
@@ -285,5 +301,5 @@ struct SpaceCard: View {
 
 #Preview {
     SpacesHubView(path: .constant([]), onSelectTask: { _ in })
-        .modelContainer(for: [TaskItem.self, Space.self, Session.self], inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self, Session.self, Goal.self], inMemory: true)
 }
