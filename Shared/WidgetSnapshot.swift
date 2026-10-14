@@ -1,12 +1,16 @@
 import Foundation
 
-/// Upcoming pending reminders, written by the app into the App Group for the widget.
+/// Upcoming pending dated items (reminders and tasks), written by the app into the App Group for the widget.
 /// Keeps the widget free of SwiftData and of the app's store location.
 nonisolated struct WidgetSnapshot: Codable, Sendable {
     struct Item: Codable, Sendable, Identifiable {
         var id: UUID
         var title: String
         var dueDate: Date
+        /// Optional so snapshots written before tasks existed still decode; nil means reminder.
+        var isReminder: Bool?
+
+        var kindLabel: String { isReminder == false ? "Tâche" : "Rappel" }
     }
 
     var upcoming: [Item]

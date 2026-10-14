@@ -8,7 +8,7 @@ struct NextReminderEntry: TimelineEntry {
 
 struct NextReminderProvider: TimelineProvider {
     func placeholder(in context: Context) -> NextReminderEntry {
-        NextReminderEntry(date: .now, reminder: WidgetSnapshot.Item(id: UUID(), title: "Appeler Karim", dueDate: .now))
+        NextReminderEntry(date: .now, reminder: WidgetSnapshot.Item(id: UUID(), title: "Appeler Karim", dueDate: .now, isReminder: true))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NextReminderEntry) -> Void) {
@@ -42,7 +42,7 @@ struct NextReminderView: View {
         Group {
             if let reminder = entry.reminder {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label(timeLabel(for: reminder.dueDate), systemImage: "bell.fill")
+                    Label("\(reminder.kindLabel) · \(timeLabel(for: reminder.dueDate))", systemImage: reminder.isReminder == false ? "checklist" : "bell.fill")
                         .font(.headline)
                         .widgetAccentable()
                     Text(reminder.title)
@@ -51,7 +51,7 @@ struct NextReminderView: View {
                 }
                 .widgetURL(URL(string: "remindersint://reminder/\(reminder.id.uuidString)"))
             } else {
-                Label("Aucun rappel à venir", systemImage: "checkmark.circle")
+                Label("Rien à venir", systemImage: "checkmark.circle")
                     .font(.headline)
                     .widgetURL(URL(string: "remindersint://capture"))
             }
@@ -75,7 +75,7 @@ struct NextReminderWidget: Widget {
             NextReminderView(entry: entry)
         }
         .configurationDisplayName("Prochain rappel")
-        .description("Heure et titre du prochain rappel en attente.")
+        .description("Heure et titre du prochain rappel ou de la prochaine tâche datée.")
         .supportedFamilies([.accessoryRectangular])
     }
 }

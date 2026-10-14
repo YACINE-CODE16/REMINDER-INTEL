@@ -112,16 +112,15 @@ final class NotificationService: NSObject {
         refreshWidget()
     }
 
-    /// Publishes the upcoming pending reminders (not plain tasks) to the lock screen widget.
+    /// Publishes the upcoming pending dated items, reminders and tasks, to the lock screen widget.
     private func refreshWidget() {
         let now = Date.now
         let upcoming = pendingReminders()
-            .filter(\.isReminder)
             .compactMap { task in task.dueDate.map { (task, $0) } }
             .filter { $0.1 > now }
             .sorted { $0.1 < $1.1 }
             .prefix(20)
-            .map { WidgetSnapshot.Item(id: $0.0.id, title: $0.0.title, dueDate: $0.1) }
+            .map { WidgetSnapshot.Item(id: $0.0.id, title: $0.0.title, dueDate: $0.1, isReminder: $0.0.isReminder) }
         WidgetSnapshot(upcoming: Array(upcoming)).save()
         WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.nextReminder)
     }

@@ -15,6 +15,8 @@ enum ParserSelfTest {
         "Envoyer la facture à la fin du mois",
         "Réviser pour la séance de jeudi",
         "Aller à la salle puis réviser les maths",
+        "Il faut que j'envoie le devis au client",
+        "Il faut que je rende le rapport de stage vendredi",
     ]
 
     @MainActor

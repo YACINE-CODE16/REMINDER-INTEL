@@ -175,16 +175,39 @@ nonisolated struct FallbackParser {
         }
     }
 
+    /// Subjunctive left after "il faut que je" → infinitive, for common verbs only.
+    private static let infinitives: [String: String] = [
+        "finisse": "finir", "rende": "rendre", "fasse": "faire", "appelle": "appeler",
+        "rappelle": "rappeler", "envoie": "envoyer", "prépare": "préparer", "révise": "réviser",
+        "relance": "relancer", "aille": "aller", "achète": "acheter", "paie": "payer",
+        "paye": "payer", "écrive": "écrire", "lise": "lire", "prenne": "prendre",
+        "mette": "mettre", "voie": "voir", "dise": "dire", "réponde": "répondre",
+        "termine": "terminer", "commence": "commencer", "contacte": "contacter", "vérifie": "vérifier",
+        "réserve": "réserver", "passe": "passer", "range": "ranger", "nettoie": "nettoyer",
+        "sorte": "sortir", "parte": "partir",
+    ]
+
     private static func cleanTitle(_ text: String) -> String {
         var title = text
-        let leading = #"^\s*(?:rappelle[- ]moi|rappel|n['’]oublie pas|fais[- ]moi penser|pense|il faut que je|il faudrait que je|faut que je|je dois)\s*(?:de\s+|d['’]|à\s+|qu['’]|que\s+)?"#
-        if let regex = try? NSRegularExpression(pattern: leading, options: [.caseInsensitive]) {
+        // "il faut que je finisse…" leaves a subjunctive: remember it to restore the infinitive.
+        let subjunctiveLead = #"^\s*(?:il\s+)?(?:faut|faudrait)\s+que\s+(?:je\s+|j['’]\s*)"#
+        var isSubjunctive = false
+        if let regex = try? NSRegularExpression(pattern: subjunctiveLead, options: [.caseInsensitive]),
+           regex.firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) != nil {
+            isSubjunctive = true
+            title = regex.stringByReplacingMatches(in: title, range: NSRange(title.startIndex..., in: title), withTemplate: "")
+        }
+        let leading = #"^\s*(?:rappelle[- ]moi|rappel|n['’]oublie pas|fais[- ]moi penser|pense|je dois)\s*(?:de\s+|d['’]|à\s+|qu['’]|que\s+)?"#
+        if !isSubjunctive, let regex = try? NSRegularExpression(pattern: leading, options: [.caseInsensitive]) {
             title = regex.stringByReplacingMatches(in: title, range: NSRange(title.startIndex..., in: title), withTemplate: "")
         }
         // Collapse spaces, then drop dangling connectors left by removed date fragments.
         title = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let dangling: Set<String> = ["à", "a", "le", "la", "pour", "vers", "de", "et", "ce", "cet", "dans", "du", "au"]
         var words = title.split(separator: " ").map(String.init)
+        if isSubjunctive, let first = words.first, let infinitive = infinitives[first.lowercased()] {
+            words[0] = infinitive
+        }
         while let last = words.last, dangling.contains(last.lowercased().trimmingCharacters(in: .punctuationCharacters)) || last.allSatisfy(\.isPunctuation) {
             words.removeLast()
         }
