@@ -6,5 +6,6 @@ struct RemindersIntWidgetBundle: WidgetBundle {
     var body: some Widget {
         VoiceCaptureControl()
         NextReminderWidget()
+        SessionLiveActivity()
     }
 }

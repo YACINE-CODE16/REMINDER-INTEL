@@ -26,20 +26,24 @@ extension SpaceBadge {
 /// "Aucun" plus every active space, indented by depth.
 struct SpaceChoiceList: View {
     var selectedID: UUID?
+    /// False where a space is required (sessions).
+    var allowsNone = true
     var onSelect: (Space?) -> Void
 
     @Query private var spaces: [Space]
 
     var body: some View {
         List {
-            choiceRow(label: "Aucun", depth: 0, isSelected: selectedID == nil) {
-                Image(systemName: "tray")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Palette.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(Palette.text.opacity(0.06), in: .rect(cornerRadius: 9))
-            } action: {
-                onSelect(nil)
+            if allowsNone {
+                choiceRow(label: "Aucun", depth: 0, isSelected: selectedID == nil) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Palette.text.opacity(0.06), in: .rect(cornerRadius: 9))
+                } action: {
+                    onSelect(nil)
+                }
             }
             ForEach(Space.roots(of: spaces).flatMap(\.subtree)) { space in
                 choiceRow(label: space.name, depth: space.pathComponents.count - 1, isSelected: space.id == selectedID) {
@@ -85,13 +89,14 @@ struct SpaceChoiceList: View {
 struct SpacePickerRow: View {
     @Binding var selection: Space?
     var title = "Espace"
+    var allowsNone = true
 
     var body: some View {
         NavigationLink {
-            SpaceChoiceDestination(selection: $selection, title: title)
+            SpaceChoiceDestination(selection: $selection, title: title, allowsNone: allowsNone)
         } label: {
             LabeledContent(title) {
-                Text(selection?.displayPath ?? "Aucun")
+                Text(selection?.displayPath ?? (allowsNone ? "Aucun" : "À choisir"))
                     .foregroundStyle(selection?.color ?? Palette.secondary)
             }
         }
@@ -101,10 +106,11 @@ struct SpacePickerRow: View {
 private struct SpaceChoiceDestination: View {
     @Binding var selection: Space?
     let title: String
+    let allowsNone: Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        SpaceChoiceList(selectedID: selection?.id) { space in
+        SpaceChoiceList(selectedID: selection?.id, allowsNone: allowsNone) { space in
             selection = space
             dismiss()
         }
@@ -113,23 +119,22 @@ private struct SpaceChoiceDestination: View {
     }
 }
 
-/// Sheet opened by "Changer" on the capture toast.
+/// Space list in a sheet: "Changer" on the capture toast, "Autre" when starting a session.
 struct SpacePickerSheet: View {
-    let item: TaskItem
-    var onPicked: (Space?) -> Void
+    var title = "Changer d'espace"
+    var selectedID: UUID?
+    var allowsNone = true
+    var onPick: (Space?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            SpaceChoiceList(selectedID: item.space?.id) { space in
-                item.space = space
-                try? item.modelContext?.save()
-                NotificationService.shared.schedule(item)
-                onPicked(space)
+            SpaceChoiceList(selectedID: selectedID, allowsNone: allowsNone) { space in
+                onPick(space)
                 dismiss()
             }
-            .navigationTitle("Changer d'espace")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

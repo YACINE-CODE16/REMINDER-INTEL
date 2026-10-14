@@ -15,6 +15,8 @@ nonisolated struct ParsedCapture: Sendable, Equatable {
     var dueDate: Date?
     /// nil when the sentence does not ask for a repeat: the default from Settings applies.
     var repeatInterval: RepeatInterval?
+    /// Length of a past session (sessionLog).
+    var duration: TimeInterval? = nil
     var confidence: Double
     /// Most likely spaces, best first; empty when nothing fits.
     var spaceGuesses: [SpaceGuess]
@@ -111,11 +113,16 @@ final class ParserService {
             guesses.append(SpaceGuess(space: space, confidence: min(max(guess.confidence, 0), 1)))
         }
         guesses.sort { $0.confidence > $1.confidence }
+        let duration = generated.durationMinutes > 0 ? TimeInterval(generated.durationMinutes * 60) : base.duration
+        var intent = generated.intent.intent
+        // A past session needs a length; without one it is a plain task.
+        if intent == .sessionLog, duration == nil { intent = .task }
         return ParsedCapture(
-            intent: generated.intent.intent,
+            intent: intent,
             title: title.isEmpty ? base.title : title,
-            dueDate: dueDate,
+            dueDate: intent == .sessionStart || intent == .sessionStop ? nil : dueDate,
             repeatInterval: generated.repeatInterval.repeatInterval ?? base.repeatInterval,
+            duration: intent == .sessionLog ? duration : nil,
             confidence: min(max(generated.confidence, 0), 1),
             spaceGuesses: guesses.isEmpty ? base.spaceGuesses : Array(guesses.prefix(3)),
             engine: .foundationModels
@@ -174,6 +181,11 @@ final class ParserService {
         - confidence : ta confiance dans l'extraction, entre 0 et 1.
         - intent : reminder pour un rappel à heure précise avec relances (« rappelle-moi », « n'oublie pas de me », une relance demandée, un appel à une heure donnée).
           task pour une chose à faire (« il faut que », « je dois », « à rendre », un devoir, « relancer quelqu'un », préparer, finir, réviser), souvent sans heure précise.
+          sessionStart quand on commence une activité maintenant (« je commence le sport », « je me mets sur la finance », « c'est parti pour les maths »).
+          sessionStop quand on arrête l'activité en cours (« j'arrête », « stop », « fini », « je fais une pause »).
+          sessionLog quand on raconte un temps déjà passé avec une durée (« j'ai fait 2h de maths ce matin », « hier j'ai bossé 45 min sur FieldZ »).
+        - durationMinutes : pour sessionLog, la durée en minutes (« 2h » = 120, « 1h30 » = 90) ; 0 sinon.
+          Pour sessionLog, dueDate est le début de la session si un moment est donné (« ce matin » = 09:00, « hier soir » = 19:00 la veille), sinon chaîne vide. Pour sessionStart et sessionStop, dueDate est une chaîne vide.
         - spaces : jusqu'à 3 espaces les plus probables parmi la liste ci-dessous, du plus probable au moins probable.
           Recopie le chemin exactement tel qu'il est écrit. Donne pour chacun une confiance entre 0 et 1.
           Préfère le sous-espace le plus précis. Si aucun espace ne correspond clairement, renvoie une liste vide.
@@ -188,7 +200,7 @@ final class ParserService {
 // Date is not a Generable type: the model writes an ISO string that is parsed afterwards.
 @Generable
 nonisolated struct GeneratedCapture {
-    @Guide(description: "reminder pour un rappel avec relances, task pour une chose à faire")
+    @Guide(description: "reminder pour un rappel avec relances, task pour une chose à faire, sessionStart / sessionStop / sessionLog pour le suivi du temps")
     var intent: GeneratedIntent
 
     @Guide(description: "L'action à faire, courte, sans « rappelle-moi de » ni « il faut que je », sans date ni relance")
@@ -199,6 +211,9 @@ nonisolated struct GeneratedCapture {
 
     @Guide(description: "Intervalle de relance demandé dans la phrase, unspecified sinon")
     var repeatInterval: GeneratedRepeatInterval
+
+    @Guide(description: "Pour sessionLog, durée de la session passée en minutes ; 0 sinon", .range(0...1440))
+    var durationMinutes: Int
 
     @Guide(description: "Confiance dans l'extraction, entre 0 et 1", .range(0.0...1.0))
     var confidence: Double
@@ -216,16 +231,22 @@ nonisolated struct GeneratedSpaceGuess {
     var confidence: Double
 }
 
-/// Session and goal intents (steps 6b / 6c) are not offered to the model yet.
+/// The goal intent (step 6c) is not offered to the model yet.
 @Generable
 nonisolated enum GeneratedIntent {
     case reminder
     case task
+    case sessionStart
+    case sessionStop
+    case sessionLog
 
     var intent: CaptureIntent {
         switch self {
         case .reminder: .reminder
         case .task: .task
+        case .sessionStart: .sessionStart
+        case .sessionStop: .sessionStop
+        case .sessionLog: .sessionLog
         }
     }
 }

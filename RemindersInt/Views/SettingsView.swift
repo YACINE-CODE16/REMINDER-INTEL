@@ -4,6 +4,7 @@ import SwiftData
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
+    @AppStorage(AppStorageKey.dailyTrackingReminder) private var dailyTrackingReminder = true
     @State private var isTestScheduled = false
     @State private var cleanupMessage: String?
 
@@ -44,6 +45,21 @@ struct SettingsView: View {
                 }
 
                 Text("Appliquée aux nouveaux rappels.")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondary)
+                    .padding(.horizontal, 4)
+
+                GlassCard {
+                    Toggle("Rappel du soir", isOn: $dailyTrackingReminder)
+                        .foregroundStyle(Palette.text)
+                        .tint(Palette.green)
+                }
+                .padding(.top, 12)
+                .onChange(of: dailyTrackingReminder) {
+                    TrackingService.shared.refreshDailyReminders()
+                }
+
+                Text("À 20 h, « Rien tracké aujourd'hui » si aucune session n'a été enregistrée.")
                     .font(.footnote)
                     .foregroundStyle(Palette.secondary)
                     .padding(.horizontal, 4)
@@ -126,5 +142,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .background(AppBackground())
-        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self, Session.self], inMemory: true)
 }

@@ -11,6 +11,7 @@ struct SpacesHubView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var spaces: [Space]
     @Query private var tasks: [TaskItem]
+    @Query private var sessions: [Session]
     @State private var isCreating = false
     @State private var showsArchived = false
 
@@ -25,9 +26,9 @@ struct SpacesHubView: View {
         NavigationStack(path: $path) {
             List {
                 header
-                    .hubRow(top: 8)
+                    .glassListRow(top: 8)
                 summaryCard
-                    .hubRow(bottom: 10)
+                    .glassListRow(bottom: 10)
 
                 ForEach(roots) { space in
                     Button {
@@ -36,7 +37,7 @@ struct SpacesHubView: View {
                         SpaceCard(space: space)
                     }
                     .buttonStyle(.plain)
-                    .hubRow()
+                    .glassListRow()
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button {
                             setArchived(true, space)
@@ -122,16 +123,28 @@ struct SpacesHubView: View {
                     .fill(Palette.secondary.opacity(0.25))
                     .frame(width: 1)
                 summaryColumn(title: "Temps tracké") {
-                    Text("—")
+                    let time = weekTime
+                    Text(TimeFormat.short(time.current))
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Palette.secondary)
-                    Text("avec le Suivi")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Palette.secondary)
+                        .foregroundStyle(Palette.text)
+                    Text("\(TimeFormat.delta(time.delta)) vs sem. dernière")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(time.delta >= 0 ? Palette.green : Palette.red)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// This week so far, and the difference with last week at the same point in time.
+    private var weekTime: (current: TimeInterval, delta: TimeInterval) {
+        let now = Date.now
+        let week = TimeTotals.week(containing: now)
+        let elapsed = now.timeIntervalSince(week.start)
+        let current = TimeTotals.seconds(sessions, in: DateInterval(start: week.start, end: now), now: now)
+        let lastStart = calendar.date(byAdding: .day, value: -7, to: week.start) ?? week.start
+        let previous = TimeTotals.seconds(sessions, in: DateInterval(start: lastStart, duration: elapsed), now: now)
+        return (current, current - previous)
     }
 
     private func summaryColumn(title: String, @ViewBuilder content: () -> some View) -> some View {
@@ -163,13 +176,13 @@ struct SpacesHubView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .hubRow(top: 14)
+        .glassListRow(top: 14)
 
         if showsArchived {
             ForEach(archived) { space in
                 SpaceCard(space: space)
                     .opacity(0.6)
-                    .hubRow()
+                    .glassListRow()
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button {
                             setArchived(false, space)
@@ -208,10 +221,11 @@ struct SpacesHubView: View {
 struct SpaceCard: View {
     let space: Space
 
-    private var counts: (children: Int, pending: Int, overdue: Int) {
+    private var counts: (children: Int, pending: Int, overdue: Int, week: TimeInterval) {
         let now = Date.now
         let pending = space.subtreeTasks.filter { $0.status == .pending }
-        return (space.sortedChildren.count, pending.count, pending.filter { $0.isOverdue(now: now) }.count)
+        let week = TimeTotals.seconds(space.subtree.flatMap(\.sessions), in: TimeTotals.week(containing: now), now: now)
+        return (space.sortedChildren.count, pending.count, pending.filter { $0.isOverdue(now: now) }.count, week)
     }
 
     /// "aucune tâche", "1 tâche", "5 tâches".
@@ -230,6 +244,9 @@ struct SpaceCard: View {
             parts.append(counts.children == 1 ? "1 sous-espace" : "\(counts.children) sous-espaces")
         }
         parts.append(Self.taskCount(counts.pending))
+        if counts.week >= 60 {
+            parts.append("\(TimeFormat.short(counts.week)) cette semaine")
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -266,16 +283,7 @@ struct SpaceCard: View {
     }
 }
 
-private extension View {
-    /// Transparent full-width list row for the glass layout.
-    func hubRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
-        listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: top, leading: 20, bottom: bottom, trailing: 20))
-    }
-}
-
 #Preview {
     SpacesHubView(path: .constant([]), onSelectTask: { _ in })
-        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self, Session.self], inMemory: true)
 }

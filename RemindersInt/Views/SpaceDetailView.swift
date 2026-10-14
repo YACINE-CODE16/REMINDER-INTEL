@@ -9,6 +9,7 @@ struct SpaceDetailView: View {
 
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
     @Query private var allTasks: [TaskItem]
+    @Query private var allSessions: [Session]
     @State private var showsFinished = false
     @State private var isAddingTask = false
 
@@ -71,6 +72,8 @@ struct SpaceDetailView: View {
         let overdue = pending.filter { $0.isOverdue() }.count
         var text = SpaceCard.taskCount(count)
         if overdue > 0 { text += " · \(overdue) en retard" }
+        let week = TimeTotals.seconds(allSessions, in: TimeTotals.week(containing: .now), within: space)
+        if week >= 60 { text = "\(TimeFormat.short(week)) cette semaine · " + text }
         if let parent = space.parent { text = "\(parent.displayPath) · " + text }
         return text
     }

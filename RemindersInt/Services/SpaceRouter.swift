@@ -6,10 +6,16 @@ nonisolated enum CaptureIntent: String, Sendable, Equatable {
     case reminder
     /// "Il faut que…", "à rendre…": a to-do, one notification at the due date if any.
     case task
-    /// Time-tracking session, step 6b. Not produced yet.
-    case session
+    /// "Je commence le sport": opens a tracking session now.
+    case sessionStart
+    /// "J'arrête", "stop": closes the open session.
+    case sessionStop
+    /// "J'ai fait 2h de maths ce matin": records a past session.
+    case sessionLog
     /// Objective, step 6c. Not produced yet.
     case goal
+
+    var isSession: Bool { self == .sessionStart || self == .sessionStop || self == .sessionLog }
 }
 
 /// A candidate space for a sentence.

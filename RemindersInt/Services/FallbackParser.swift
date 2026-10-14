@@ -28,6 +28,13 @@ nonisolated struct FallbackParser {
 
     func parse(_ text: String) -> Output {
         var rest = text
+        // Session sentences first: "j'ai fait 2h" must not be read as 02:00.
+        var sessionIntent = Self.sessionIntent(of: text)
+        var duration: TimeInterval?
+        if sessionIntent == .sessionLog {
+            duration = Self.takeDuration(from: &rest)
+            if duration == nil { sessionIntent = nil }
+        }
         var minutesOffset: Int?
         var dayOffset: Int?
         var hour: Int?
@@ -61,6 +68,10 @@ nonisolated struct FallbackParser {
         // Day.
         if Self.take(#"après-demain"#, from: &rest) != nil {
             dayOffset = 2
+        } else if Self.take(#"avant-hier"#, from: &rest) != nil {
+            dayOffset = -2
+        } else if Self.take(#"hier"#, from: &rest) != nil {
+            dayOffset = -1
         } else if Self.take(#"demain"#, from: &rest) != nil {
             dayOffset = 1
         } else if Self.take(#"aujourd['’]hui"#, from: &rest) != nil {
@@ -98,8 +109,16 @@ nonisolated struct FallbackParser {
             if let partOfDayHour, partOfDayHour >= 15, value < 12 { hour = value + 12 }
         }
 
-        let dueDate = resolveDate(minutesOffset: minutesOffset, dayOffset: dayOffset, hour: hour ?? partOfDayHour, minute: minute)
-        let intent = Self.intent(
+        let dueDate = resolveDate(
+            minutesOffset: minutesOffset,
+            dayOffset: dayOffset,
+            hour: hour ?? partOfDayHour,
+            minute: minute,
+            preferPast: sessionIntent == .sessionLog
+        )
+        // "Je commence le DM demain" plans something: not a session starting now.
+        if sessionIntent == .sessionStart, dueDate != nil { sessionIntent = nil }
+        let intent = sessionIntent ?? Self.intent(
             of: text,
             hasRepeat: repeatInterval != nil,
             hasExplicitTime: hour != nil || minutesOffset != nil
@@ -107,13 +126,62 @@ nonisolated struct FallbackParser {
         let capture = ParsedCapture(
             intent: intent,
             title: Self.cleanTitle(rest),
-            dueDate: dueDate,
-            repeatInterval: repeatInterval,
+            dueDate: intent == .sessionStart || intent == .sessionStop ? nil : dueDate,
+            repeatInterval: intent.isSession ? nil : repeatInterval,
+            duration: duration,
             confidence: dueDate == nil ? 0.3 : 0.6,
             spaceGuesses: SpaceRouter(spaces: spaces).route(text),
             engine: .fallback
         )
         return Output(capture: capture, isRelativeOffset: minutesOffset != nil)
+    }
+
+    private static let startMarkers = #"\bje commence\b|\bje me mets\b|\bje m['’]y mets\b|\bje d[ée]marre\b|\bc['’]est parti\b|\bje m['’]attaque\b|\bje lance (?:une|la|le) (?:session|chrono)"#
+    private static let stopMarkers = #"^\s*(?:stop|j['’]arr[êe]te|je m['’]arr[êe]te|j['’]ai fini|j['’]ai termin[ée]|fini|termin[ée]|c['’]est fini|fin de (?:la )?session|je fais une pause|pause)\b"#
+    private static let logMarkers = #"\bj['’]ai\s+(?:fait|bossé|bosse|travaillé|révisé|étudié|passé|couru|joué|lu|codé)\b"#
+
+    /// Session sentences: start / stop / past log. Nil for anything else.
+    static func sessionIntent(of text: String) -> CaptureIntent? {
+        let options: String.CompareOptions = [.regularExpression, .caseInsensitive]
+        if text.range(of: logMarkers, options: options) != nil, durationMatch(in: text) != nil {
+            return .sessionLog
+        }
+        if text.range(of: stopMarkers, options: options) != nil {
+            // "J'ai fini le DM de maths" is a task update, not the end of a session.
+            let words = text.split(whereSeparator: { $0.isWhitespace }).count
+            if words <= 4 || text.range(of: #"session|chrono"#, options: options) != nil {
+                return .sessionStop
+            }
+        }
+        if text.range(of: startMarkers, options: options) != nil {
+            return .sessionStart
+        }
+        return nil
+    }
+
+    private static let durationPattern = #"(?:(\d+)\s*h(?:eures?)?\s*(\d{1,2})?(?!\d)(?:\s*min(?:utes?)?)?|(\d+)\s*(?:min|minutes?)\b|(une|deux|trois|quatre|cinq|six)\s+heures?(\s+et\s+demie)?|une\s+demi-heure|trois\s+quarts\s+d['’]heure|un\s+quart\s+d['’]heure)"#
+
+    private static func durationMatch(in text: String) -> Range<String.Index>? {
+        text.range(of: durationPattern, options: [.regularExpression, .caseInsensitive])
+    }
+
+    /// Removes the first duration ("2h", "1h30", "45 min", "une heure et demie") and returns it.
+    static func takeDuration(from text: inout String) -> TimeInterval? {
+        guard let match = take(durationPattern, from: &text) else { return nil }
+        let whole = match[0].lowercased()
+        if whole.contains("demi-heure") { return 30 * 60 }
+        if whole.contains("trois quarts") { return 45 * 60 }
+        if whole.contains("quart") { return 15 * 60 }
+        if let hours = number(match[1]) {
+            return TimeInterval(hours * 3600 + (number(match[2]) ?? 0) * 60)
+        }
+        if let minutes = number(match[3]) {
+            return TimeInterval(minutes * 60)
+        }
+        if let hours = number(match[4]) {
+            return TimeInterval(hours * 3600 + (match[5].isEmpty ? 0 : 1800))
+        }
+        return nil
     }
 
     /// "Rappelle-moi" or a repeat → reminder; "il faut que", "à rendre", "relancer"… → task;
@@ -128,7 +196,8 @@ nonisolated struct FallbackParser {
         return hasExplicitTime ? .reminder : .task
     }
 
-    private func resolveDate(minutesOffset: Int?, dayOffset: Int?, hour: Int?, minute: Int?) -> Date? {
+    /// `preferPast`: for a past session, a bare time later than now means yesterday, not tomorrow.
+    private func resolveDate(minutesOffset: Int?, dayOffset: Int?, hour: Int?, minute: Int?, preferPast: Bool = false) -> Date? {
         if let minutesOffset {
             return calendar.date(byAdding: .minute, value: minutesOffset, to: now)
         }
@@ -137,6 +206,12 @@ nonisolated struct FallbackParser {
         guard let day = calendar.date(byAdding: .day, value: dayOffset ?? 0, to: startOfToday),
               let date = calendar.date(bySettingHour: hour ?? 9, minute: minute ?? 0, second: 0, of: day)
         else { return nil }
+        if preferPast {
+            if dayOffset == nil, date > now {
+                return calendar.date(byAdding: .day, value: -1, to: date)
+            }
+            return date
+        }
         // A bare time already passed today means tomorrow.
         if dayOffset == nil, date <= now {
             return calendar.date(byAdding: .day, value: 1, to: date)

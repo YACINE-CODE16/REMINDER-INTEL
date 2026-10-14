@@ -15,6 +15,7 @@ final class Space {
     var parent: Space?
     @Relationship(deleteRule: .cascade, inverse: \Space.parent) var children: [Space] = []
     @Relationship(deleteRule: .nullify, inverse: \TaskItem.space) var tasks: [TaskItem] = []
+    @Relationship(deleteRule: .cascade, inverse: \Session.space) var sessions: [Session] = []
 
     init(
         id: UUID = UUID(),

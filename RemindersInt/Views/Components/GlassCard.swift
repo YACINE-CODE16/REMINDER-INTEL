@@ -26,6 +26,13 @@ extension View {
         }
     }
 
+    /// Transparent full-width list row for the glass layout.
+    func glassListRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
+        listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: top, leading: 20, bottom: bottom, trailing: 20))
+    }
+
     /// Very light drop shadow for cards.
     func softShadow() -> some View {
         shadow(color: .black.opacity(0.05), radius: 10, y: 4)

@@ -50,7 +50,7 @@ final class NotificationService: NSObject {
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([category])
+        center.setNotificationCategories([category, TrackingService.notificationCategory])
     }
 
     /// iOS only shows the prompt once; later calls return the stored answer.
@@ -298,9 +298,17 @@ extension NotificationService: UNUserNotificationCenterDelegate {
     ) {
         let target = Self.target(of: response.notification)
         let action = response.actionIdentifier
+        let category = response.notification.request.content.categoryIdentifier
+        let identifier = response.notification.request.identifier
         nonisolated(unsafe) let completion = completionHandler
         Task { @MainActor in
-            self.handleResponse(action: action, target: target)
+            if category == TrackingService.longSessionCategory {
+                TrackingService.shared.handleNotificationResponse(action: action)
+            } else if TrackingService.isDailyReminder(identifier) {
+                TrackingService.shared.handleDailyReminderTap()
+            } else {
+                self.handleResponse(action: action, target: target)
+            }
             completion()
         }
     }

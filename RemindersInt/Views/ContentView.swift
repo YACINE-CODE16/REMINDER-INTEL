@@ -17,13 +17,15 @@ struct ContentView: View {
     @State private var voiceDraft: VoiceDraft?
     @State private var pendingVoiceDraft: VoiceDraft?
     @State private var captureOutcome: CaptureOutcome?
-    @State private var spacePickerItem: TaskItem?
+    @State private var isChangingSpace = false
+    @State private var showsStats = false
     @State private var detailItem: TaskItem?
     #if DEBUG
     @State private var debugDictation: String?
     #endif
 
     private let notifications = NotificationService.shared
+    private let tracking = TrackingService.shared
     private let captureRequests = VoiceCaptureRequests.shared
 
     var body: some View {
@@ -77,10 +79,13 @@ struct ContentView: View {
                     }
             }
         }
-        .sheet(item: $spacePickerItem) { item in
-            SpacePickerSheet(item: item) { _ in
-                captureOutcome?.proposals = []
-                restartToast()
+        .sheet(isPresented: $isChangingSpace) {
+            if let captureOutcome {
+                SpacePickerSheet(
+                    selectedID: captureOutcome.currentSpace?.id,
+                    allowsNone: captureOutcome.allowsNone,
+                    onPick: changeSpace
+                )
             }
         }
         .sheet(item: $detailItem) { item in
@@ -108,6 +113,7 @@ struct ContentView: View {
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }
             notifications.syncSentCounts()
+            tracking.resume()
             // Lock screen control whose intent ran in the widget extension.
             if captureRequests.takePending() { openVoiceCapture() }
         }
@@ -116,6 +122,10 @@ struct ContentView: View {
             if captureRequests.takePending() { openVoiceCapture() }
         }
         .onOpenURL(perform: handleDeepLink)
+        .onChange(of: tracking.showTrackingRequests) {
+            closeSheets()
+            selectedTab = .tracking
+        }
         .onChange(of: notifications.taskToOpen, initial: true) { _, id in
             guard let id else { return }
             notifications.taskToOpen = nil
@@ -150,7 +160,7 @@ struct ContentView: View {
             case .spaces:
                 SpacesHubView(path: $spacesPath, onSelectTask: { detailItem = $0 })
             case .tracking:
-                TrackingView()
+                TrackingView(showsStats: $showsStats)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -158,8 +168,8 @@ struct ContentView: View {
                 if let captureOutcome {
                     CaptureToastView(
                         outcome: captureOutcome,
-                        onPick: { file(captureOutcome.item, in: $0) },
-                        onChange: { spacePickerItem = captureOutcome.item }
+                        onPick: answer,
+                        onChange: { isChangingSpace = true }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: captureOutcome.id) {
@@ -192,19 +202,50 @@ struct ContentView: View {
         )
     }
 
-    /// Answer to "Dans quel espace ?": files the task, then shows the confirmation.
+    /// Answer to "Dans quel espace ?": files the task or creates the pending session.
+    private func answer(_ space: Space?) {
+        guard let outcome = captureOutcome else { return }
+        switch outcome.kind {
+        case .task(let item):
+            file(item, in: space)
+            showToast(.task(item), from: outcome)
+        case .pendingSession(let pending):
+            guard let space else { return }
+            if pending.isLog, let end = pending.end {
+                showToast(.sessionLogged(tracking.log(in: space, from: pending.start, to: end, transcript: outcome.transcript)), from: outcome)
+            } else if let session = tracking.start(in: space, at: pending.start, transcript: outcome.transcript) {
+                showToast(.sessionStarted(session), from: outcome)
+            }
+        default:
+            break
+        }
+    }
+
+    /// "Changer" on the toast: moves the task or the sessions to another space.
+    private func changeSpace(_ space: Space?) {
+        guard let outcome = captureOutcome else { return }
+        switch outcome.kind {
+        case .task(let item):
+            file(item, in: space)
+        case .sessionStarted(let session):
+            if let space { tracking.move([session], to: space) }
+        case .sessionLogged(let sessions):
+            if let space { tracking.move(sessions, to: space) }
+        default:
+            break
+        }
+        showToast(outcome.kind, from: outcome)
+    }
+
     private func file(_ item: TaskItem, in space: Space?) {
         item.space = space
         try? modelContext.save()
         NotificationService.shared.schedule(item)
-        captureOutcome?.proposals = []
-        restartToast()
     }
 
-    /// Gives the updated toast a fresh display time.
-    private func restartToast() {
-        guard let outcome = captureOutcome else { return }
-        captureOutcome = CaptureOutcome(item: outcome.item, transcript: outcome.transcript, proposals: outcome.proposals)
+    /// Shows the updated result, with a fresh display time and no more suggestions.
+    private func showToast(_ kind: CaptureOutcome.Kind, from outcome: CaptureOutcome) {
+        captureOutcome = CaptureOutcome(kind: kind, transcript: outcome.transcript, proposals: [])
     }
 
     /// A dictation without a date continues in the form once the panel is closed.
@@ -219,15 +260,21 @@ struct ContentView: View {
 
     #if DEBUG
     /// Screenshot and test helpers:
-    /// `-uiTab day|month|spaces|tracking|settings`, `-uiSpace <name>` (opens that space),
+    /// `-seedDemoSessions YES` (two weeks of sessions, once), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
     /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
     /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
     private func applyDebugLaunchArguments() async {
         let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "seedDemoSessions") {
+            DemoSessions.insert(into: modelContext)
+        }
         switch defaults.string(forKey: "uiTab") {
         case "month": selectedTab = .month
         case "spaces": selectedTab = .spaces
         case "tracking": selectedTab = .tracking
+        case "stats":
+            selectedTab = .tracking
+            showsStats = true
         case "settings": isShowingSettings = true
         default: break
         }
@@ -260,12 +307,16 @@ struct ContentView: View {
     }
     #endif
 
-    /// remindersint://capture opens the dictation, remindersint://reminder/<uuid> a detail.
+    /// remindersint://capture opens the dictation, remindersint://reminder/<uuid> a detail,
+    /// remindersint://tracking the Suivi tab (Live Activity tap).
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "remindersint" else { return }
         switch url.host() {
         case "capture":
             openVoiceCapture()
+        case "tracking":
+            closeSheets()
+            selectedTab = .tracking
         case "reminder":
             if let id = UUID(uuidString: url.lastPathComponent) {
                 notifications.taskToOpen = id
@@ -277,12 +328,16 @@ struct ContentView: View {
 
     /// Closes the root sheets so the capture can be presented; it starts listening on appear.
     private func openVoiceCapture() {
+        closeSheets()
+        isCapturingVoice = true
+    }
+
+    private func closeSheets() {
         isAddingReminder = false
         isShowingSettings = false
         voiceDraft = nil
         detailItem = nil
-        spacePickerItem = nil
-        isCapturingVoice = true
+        isChangingSpace = false
     }
 }
 
@@ -296,5 +351,5 @@ struct VoiceDraft: Identifiable {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [TaskItem.self, Space.self], inMemory: true)
+        .modelContainer(for: [TaskItem.self, Space.self, Session.self], inMemory: true)
 }

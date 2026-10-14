@@ -142,7 +142,13 @@ struct VoiceCaptureView: View {
             let parsed = await ParserService.shared.parse(text, spaces: spaces.map(\.ref))
             isParsing = false
             let space = parsed.space.flatMap { ref in spaces.first { $0.id == ref.id } }
-            // Session and goal intents are not produced yet (steps 6b / 6c).
+            let proposals = space == nil ? Self.proposals(for: parsed, in: spaces) : []
+            if parsed.intent.isSession {
+                onCreated(Self.handleSession(parsed, space: space, proposals: proposals, transcript: text))
+                onClose()
+                return
+            }
+            // The goal intent is not produced yet (step 6c).
             let isReminder = parsed.intent == .reminder
             if isReminder, parsed.dueDate == nil {
                 onNeedsDate(VoiceDraft(title: parsed.title, transcript: text, space: space))
@@ -160,19 +166,42 @@ struct VoiceCaptureView: View {
             modelContext.insert(item)
             try? modelContext.save()
             NotificationService.shared.schedule(item)
-            onCreated(CaptureOutcome(
-                item: item,
-                transcript: text,
-                proposals: space == nil ? Self.proposals(for: parsed, in: spaces) : []
-            ))
+            onCreated(CaptureOutcome(kind: .task(item), transcript: text, proposals: proposals))
             onClose()
+        }
+    }
+
+    /// Start, stop or log a session. Without a confident space, the toast asks for one.
+    static func handleSession(_ parsed: ParsedCapture, space: Space?, proposals: [Space], transcript: String) -> CaptureOutcome {
+        let tracking = TrackingService.shared
+        let now = Date.now
+        switch parsed.intent {
+        case .sessionStop:
+            return CaptureOutcome(kind: .sessionStopped(tracking.stop(at: now)), transcript: transcript, proposals: [])
+        case .sessionLog:
+            let length = parsed.duration ?? 3600
+            var start = parsed.dueDate ?? now.addingTimeInterval(-length)
+            // A past session cannot end in the future.
+            if start.addingTimeInterval(length) > now { start = now.addingTimeInterval(-length) }
+            let end = start.addingTimeInterval(length)
+            guard let space else {
+                return CaptureOutcome(kind: .pendingSession(PendingSession(isLog: true, start: start, end: end)), transcript: transcript, proposals: proposals)
+            }
+            let sessions = tracking.log(in: space, from: start, to: end, transcript: transcript)
+            return CaptureOutcome(kind: .sessionLogged(sessions), transcript: transcript, proposals: [])
+        default:
+            guard let space, let session = tracking.start(in: space, at: now, transcript: transcript) else {
+                return CaptureOutcome(kind: .pendingSession(PendingSession(isLog: false, start: now)), transcript: transcript, proposals: proposals)
+            }
+            return CaptureOutcome(kind: .sessionStarted(session), transcript: transcript, proposals: [])
         }
     }
 
     /// The parser's guesses first, then the most used spaces, then the first roots: 3 at most.
     static func proposals(for parsed: ParsedCapture, in spaces: [Space]) -> [Space] {
         var result = parsed.spaceGuesses.compactMap { guess in spaces.first { $0.id == guess.space.id } }
-        let byUse = spaces.sorted { $0.tasks.count > $1.tasks.count }.filter { !$0.tasks.isEmpty }
+        let use: (Space) -> Int = { $0.tasks.count + $0.sessions.count }
+        let byUse = spaces.filter { use($0) > 0 }.sorted { use($0) > use($1) }
         let roots = spaces.filter { $0.parent == nil }
         for candidate in byUse + roots where result.count < 3 && !result.contains(where: { $0.id == candidate.id }) {
             result.append(candidate)
@@ -223,102 +252,5 @@ struct WaveformView: View {
             }
         }
         .accessibilityHidden(true)
-    }
-}
-
-/// Result of a dictation, shown in the capture toast.
-struct CaptureOutcome: Identifiable {
-    let id = UUID()
-    let item: TaskItem
-    let transcript: String
-    /// Suggested spaces when the parser was not confident enough; empty once filed.
-    var proposals: [Space]
-
-    var asksForSpace: Bool { item.space == nil && !proposals.isEmpty }
-}
-
-/// Black capsule above the tab bar: what was created and where, with "Changer",
-/// or "Dans quel espace ?" with 3 suggestions and "Aucun".
-struct CaptureToastView: View {
-    let outcome: CaptureOutcome
-    var onPick: (Space?) -> Void
-    var onChange: () -> Void
-
-    private var kind: String { outcome.item.isReminder ? "Rappel ajouté" : "Tâche ajoutée" }
-
-    private var headline: String {
-        if outcome.asksForSpace { return "\(kind) · Dans quel espace ?" }
-        guard let space = outcome.item.space else { return "\(kind), sans espace" }
-        return "\(kind) dans \(space.displayPath)"
-    }
-
-    private var detail: String {
-        guard let dueDate = outcome.item.dueDate else { return outcome.transcript }
-        return "\(VoiceCaptureView.dayAndTime(for: dueDate)) · \(outcome.transcript)"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: outcome.asksForSpace ? "questionmark.circle.fill" : "checkmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(outcome.asksForSpace ? .white : Palette.green)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(headline)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(detail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 4)
-                if !outcome.asksForSpace {
-                    Button("Changer", action: onChange)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(height: 30)
-                        .background(.white.opacity(0.16), in: .capsule)
-                        .buttonStyle(.plain)
-                }
-            }
-            if outcome.asksForSpace {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(outcome.proposals) { space in
-                            chip(space.name, color: space.color) { onPick(space) }
-                        }
-                        chip("Aucun", color: nil) { onPick(nil) }
-                    }
-                }
-                .scrollIndicators(.hidden)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Palette.text, in: .rect(cornerRadius: 26))
-        .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
-        .padding(.horizontal, 20)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func chip(_ title: String, color: Color?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let color {
-                    Circle().fill(color).frame(width: 8, height: 8)
-                }
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(.white.opacity(0.16), in: .capsule)
-        }
-        .buttonStyle(.plain)
     }
 }
