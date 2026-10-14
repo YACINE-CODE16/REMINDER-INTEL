@@ -16,50 +16,50 @@ struct ReminderCard: View {
     }
 
     var body: some View {
-        GlassCard {
-            HStack(spacing: 14) {
+        GlassCard(padding: 14) {
+            HStack(spacing: 12) {
                 Text(reminder.dueDate.formatted(.dateTime.hour().minute().locale(.app)))
-                    .font(.headline.bold())
+                    .font(.system(size: 17, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(isCancelled ? Palette.secondary : Palette.text)
-                    .frame(width: 54, alignment: .leading)
+                    .frame(width: 50, alignment: .leading)
+
+                Rectangle()
+                    .fill(Palette.secondary.opacity(0.25))
+                    .frame(width: 1, height: 34)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(reminder.title)
-                        .font(.body.weight(.medium))
+                        .font(.system(size: 16, weight: .semibold))
                         .strikethrough(isCancelled)
                         .foregroundStyle(isCancelled ? Palette.secondary : Palette.text)
                         .lineLimit(2)
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(.system(size: 12))
                         .foregroundStyle(Palette.secondary)
                 }
 
                 Spacer(minLength: 8)
 
-                statusIcon
-                    .font(.title3.weight(.semibold))
+                statusBadge
             }
         }
         .opacity(isCancelled ? 0.6 : 1)
         .contentShape(.rect(cornerRadius: 24))
     }
 
-    @ViewBuilder
-    private var statusIcon: some View {
-        switch reminder.status {
-        case .pending:
-            Image(systemName: "arrow.clockwise")
-                .foregroundStyle(Palette.secondary)
-                .accessibilityLabel("En attente")
-        case .done:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Palette.green)
-                .accessibilityLabel("Fait")
-        case .cancelled:
-            Image(systemName: "xmark.circle")
-                .foregroundStyle(Palette.secondary)
-                .accessibilityLabel("Annulé")
+    private var statusBadge: some View {
+        let style: (symbol: String, foreground: Color, background: Color, label: String) = switch reminder.status {
+        case .pending: ("arrow.clockwise", Palette.secondary, Palette.text.opacity(0.06), "En attente")
+        case .done: ("checkmark", .white, Palette.green, "Fait")
+        case .cancelled: ("xmark", Palette.secondary, Palette.text.opacity(0.06), "Annulé")
         }
+        return Image(systemName: style.symbol)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(style.foreground)
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 34, height: 34)
+            .background(style.background, in: .rect(cornerRadius: 12))
+            .accessibilityLabel(style.label)
     }
 }

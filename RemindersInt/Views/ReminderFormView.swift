@@ -51,6 +51,9 @@ struct ReminderFormView: View {
         return calendar.date(from: components) ?? date
     }
 
+    /// White translucent rows so the halos of the background show through, like the glass cards.
+    private static let rowBackground = Color.white.opacity(0.7)
+
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -62,10 +65,12 @@ struct ReminderFormView: View {
                     TextField("Titre", text: $title, axis: .vertical)
                         .focused($isTitleFocused)
                 }
+                .listRowBackground(Self.rowBackground)
                 Section {
                     DatePicker("Date", selection: $dueDate, displayedComponents: .date)
                     DatePicker("Heure", selection: $dueDate, displayedComponents: .hourAndMinute)
                 }
+                .listRowBackground(Self.rowBackground)
                 Section {
                     Picker("Relance", selection: $repeatInterval) {
                         ForEach(RepeatInterval.allCases) { interval in
@@ -73,6 +78,7 @@ struct ReminderFormView: View {
                         }
                     }
                 }
+                .listRowBackground(Self.rowBackground)
             }
             .tint(Palette.green)
             .scrollContentBackground(.hidden)

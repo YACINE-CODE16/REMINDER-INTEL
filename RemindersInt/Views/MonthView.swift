@@ -23,7 +23,7 @@ struct MonthView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                GlassCard(cornerRadius: 28) {
+                GlassCard(cornerRadius: 28, padding: 12) {
                     monthGrid
                 }
                 selectedDaySection
@@ -60,7 +60,7 @@ struct MonthView: View {
 
     private func monthButton(systemImage: String, label: String, offset: Int) -> some View {
         Button {
-            withAnimation(.snappy) {
+            withAnimation(.appSpring) {
                 displayedMonth = calendar.date(byAdding: .month, value: offset, to: displayedMonth) ?? displayedMonth
             }
         } label: {
@@ -72,6 +72,7 @@ struct MonthView: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .circle)
+        .glassRim(.circle)
         .accessibilityLabel(label)
     }
 
@@ -100,7 +101,7 @@ struct MonthView: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
         let markedDays = daysWithReminders
 
-        return LazyVGrid(columns: columns, spacing: 6) {
+        return LazyVGrid(columns: columns, spacing: 4) {
             ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                 Text(symbol.uppercased())
                     .font(.caption.weight(.semibold))
@@ -112,7 +113,7 @@ struct MonthView: View {
                 if let day {
                     dayCell(day, hasReminders: markedDays.contains(calendar.startOfDay(for: day)))
                 } else {
-                    Color.clear.frame(height: 44)
+                    Color.clear.frame(height: 46)
                 }
             }
         }
@@ -123,21 +124,23 @@ struct MonthView: View {
         let isToday = calendar.isDateInToday(day)
 
         return Button {
-            withAnimation(.snappy) { selectedDate = day }
+            withAnimation(.appSpring) { selectedDate = day }
         } label: {
             VStack(spacing: 3) {
                 Text(day.formatted(.dateTime.day().locale(.app)))
-                    .font(.callout.weight(isSelected || isToday ? .bold : .regular))
+                    .font(.callout.weight(isSelected || isToday ? .bold : .medium))
                     .foregroundStyle(isSelected ? .white : (isToday ? Palette.green : Palette.text))
-                    .frame(width: 34, height: 34)
-                    .background {
-                        if isSelected {
-                            Circle().fill(Palette.text)
-                        }
-                    }
                 Circle()
                     .fill(hasReminders ? Palette.green : .clear)
                     .frame(width: 5, height: 5)
+            }
+            .frame(width: 46, height: 46)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Palette.text)
+                        .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
+                }
             }
             .frame(maxWidth: .infinity)
             .contentShape(.rect)

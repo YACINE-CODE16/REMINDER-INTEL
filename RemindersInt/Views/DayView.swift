@@ -17,7 +17,7 @@ struct DayView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             header
             daySelector
             reminderList
@@ -54,6 +54,7 @@ struct DayView: View {
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: .circle)
+            .glassRim(.circle)
             .accessibilityLabel("Calendrier")
         }
         .padding(.horizontal, 20)
@@ -62,13 +63,13 @@ struct DayView: View {
     // MARK: - Day selector
 
     private var daySelector: some View {
-        HStack(spacing: 4) {
-            ForEach(-2...2, id: \.self) { offset in
-                dayButton(calendar.date(byAdding: .day, value: offset, to: selectedDate) ?? selectedDate)
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(-2...2, id: \.self) { offset in
+                    dayButton(calendar.date(byAdding: .day, value: offset, to: selectedDate) ?? selectedDate)
+                }
             }
         }
-        .padding(6)
-        .glassEffect(.regular.tint(.white.opacity(0.6)), in: .rect(cornerRadius: 24))
         .padding(.horizontal, 20)
     }
 
@@ -76,30 +77,36 @@ struct DayView: View {
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day)
         let hasReminders = reminders.contains { calendar.isDate($0.dueDate, inSameDayAs: day) }
+        let shape = RoundedRectangle(cornerRadius: 20)
 
         return Button {
-            withAnimation(.snappy) { selectedDate = calendar.startOfDay(for: day) }
+            withAnimation(.appSpring) { selectedDate = calendar.startOfDay(for: day) }
         } label: {
             VStack(spacing: 4) {
                 Text(day.formatted(.dateTime.weekday(.abbreviated).locale(.app)).uppercased())
                     .font(.caption2.weight(.semibold))
+                    .foregroundStyle(isSelected ? .white.opacity(0.7) : Palette.secondary)
                 Text(day.formatted(.dateTime.day().locale(.app)))
-                    .font(.title3.weight(.semibold))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(isSelected ? .white : (isToday ? Palette.green : Palette.text))
                 Circle()
                     .fill(hasReminders ? Palette.green : .clear)
                     .frame(width: 5, height: 5)
             }
-            .foregroundStyle(isSelected ? .white : (isToday ? Palette.green : Palette.text))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 20).fill(Palette.text)
-                }
-            }
-            .contentShape(.rect(cornerRadius: 20))
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .background {
+            if isSelected {
+                shape
+                    .fill(Palette.text)
+                    .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+            }
+        }
+        .glassEffect(isSelected ? .identity : .regular.tint(.white.opacity(0.55)).interactive(), in: shape)
+        .glassRim(shape, opacity: isSelected ? 0 : 0.9)
     }
 
     // MARK: - List
@@ -156,6 +163,8 @@ struct DayView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // Room for the first card's shadow, which the list would otherwise clip.
+        .contentMargins(.top, 10, for: .scrollContent)
         .confirmationDialog(
             "Supprimer ce rappel ?",
             isPresented: Binding(
@@ -166,7 +175,7 @@ struct DayView: View {
             presenting: reminderToDelete
         ) { reminder in
             Button("Supprimer", role: .destructive) {
-                withAnimation { NotificationService.shared.delete(reminder) }
+                withAnimation(.appSpring) { NotificationService.shared.delete(reminder) }
             }
             Button("Garder", role: .cancel) {}
         } message: { reminder in
@@ -175,7 +184,7 @@ struct DayView: View {
     }
 
     private func setStatus(_ status: ReminderStatus, for reminder: Reminder) {
-        withAnimation { NotificationService.shared.setStatus(status, for: reminder) }
+        withAnimation(.appSpring) { NotificationService.shared.setStatus(status, for: reminder) }
     }
 }
 

@@ -2,18 +2,21 @@ import SwiftUI
 import SwiftData
 
 /// Voice capture panel: live transcript, waveform, green validate button.
+/// Shown as an overlay by the root view, over the dimmed and blurred app.
 struct VoiceCaptureView: View {
     /// Called with the confirmation message once the reminder is created.
     var onCreated: (String) -> Void
     /// Called when no date was dictated, so the form can ask for one.
     var onNeedsDate: (_ title: String, _ transcript: String) -> Void
+    /// Closes the panel.
+    var onClose: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
 
     @State private var speech = SpeechService()
     @State private var isParsing = false
+    @State private var dragOffset: CGFloat = 0
     #if DEBUG
     @State private var simulatedText = ""
     #endif
@@ -26,13 +29,13 @@ struct VoiceCaptureView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             statusRow
 
             Text(currentText.isEmpty ? "Dites votre rappel…" : currentText)
-                .font(.title.weight(.semibold))
-                .foregroundStyle(currentText.isEmpty ? Palette.secondary : Palette.text)
-                .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(currentText.isEmpty ? .white.opacity(0.5) : .white)
+                .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
                 .animation(.default, value: currentText)
 
             #if DEBUG
@@ -42,17 +45,33 @@ struct VoiceCaptureView: View {
                 .onSubmit { validate() }
             #endif
 
-            Spacer(minLength: 0)
-
             HStack(spacing: 16) {
                 WaveformView(level: speech.level)
                     .frame(height: 44)
                 validateButton
             }
         }
-        .padding(24)
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
+        .padding(22)
+        .glassEffect(.regular.tint(.black.opacity(0.25)), in: .rect(cornerRadius: 30))
+        .glassRim(.rect(cornerRadius: 30), opacity: 0.25)
+        .environment(\.colorScheme, .dark)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .offset(y: dragOffset)
+        // Swipe down to close, like the former sheet.
+        .gesture(
+            DragGesture()
+                .onChanged { dragOffset = max(0, $0.translation.height) }
+                .onEnded { value in
+                    if value.translation.height > 80 {
+                        onClose()
+                    } else {
+                        withAnimation(.appSpring) { dragOffset = 0 }
+                    }
+                }
+        )
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onClose)
         .task { await speech.start() }
         .onDisappear { speech.stop() }
     }
@@ -78,7 +97,7 @@ struct VoiceCaptureView: View {
             }
         }
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Palette.secondary)
+        .foregroundStyle(.white.opacity(0.75))
     }
 
     private var validateButton: some View {
@@ -88,15 +107,16 @@ struct VoiceCaptureView: View {
                     ProgressView().tint(.white)
                 } else {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                 }
             }
             .foregroundStyle(.white)
-            .frame(width: 64, height: 64)
-            .contentShape(.circle)
+            .frame(width: 56, height: 56)
+            .contentShape(.rect(cornerRadius: 20))
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(Palette.green).interactive(), in: .circle)
+        .glassEffect(.regular.tint(Palette.green).interactive(), in: .rect(cornerRadius: 20))
+        .glassRim(.rect(cornerRadius: 20), opacity: 0.4)
         .disabled(isParsing || currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .accessibilityLabel("Valider")
     }
@@ -111,7 +131,7 @@ struct VoiceCaptureView: View {
             isParsing = false
             guard let dueDate = parsed.dueDate else {
                 onNeedsDate(parsed.title, text)
-                dismiss()
+                onClose()
                 return
             }
             let reminder = Reminder(
@@ -124,7 +144,7 @@ struct VoiceCaptureView: View {
             try? modelContext.save()
             NotificationService.shared.schedule(reminder)
             onCreated(Self.confirmation(for: dueDate))
-            dismiss()
+            onClose()
         }
     }
 
@@ -146,19 +166,19 @@ struct VoiceCaptureView: View {
     }
 }
 
-/// Dictation-style bars driven by the recent input levels.
+/// Dictation-style white bars driven by the recent input levels.
 struct WaveformView: View {
     var level: Double
 
-    private static let barCount = 28
+    private static let barCount = 18
     @State private var samples = Array(repeating: 0.0, count: barCount)
 
     var body: some View {
         GeometryReader { proxy in
-            HStack(alignment: .center, spacing: 3) {
+            HStack(alignment: .center, spacing: 4) {
                 ForEach(samples.indices, id: \.self) { index in
                     Capsule()
-                        .fill(Palette.text.opacity(0.75))
+                        .fill(.white.opacity(0.9))
                         .frame(height: max(4, samples[index] * proxy.size.height))
                 }
             }

@@ -22,32 +22,33 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            AppBackground()
+            mainContent
+                .blur(radius: isCapturingVoice ? 14 : 0)
+                .allowsHitTesting(!isCapturingVoice)
+                .accessibilityHidden(isCapturingVoice)
 
-            switch selectedTab {
-            case .day:
-                DayView(
-                    selectedDate: $selectedDate,
-                    onShowCalendar: { selectedTab = .month },
-                    onSelect: { detailReminder = $0 }
-                )
-            case .month:
-                MonthView(
-                    selectedDate: $selectedDate,
-                    onShowDay: { selectedTab = .day },
-                    onSelect: { detailReminder = $0 }
-                )
-            case .settings:
-                SettingsView()
+            if isCapturingVoice {
+                // The app underneath, darkened and blurred.
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .onTapGesture(perform: closeVoiceCapture)
+                    .transition(.opacity)
+                    .accessibilityHidden(true)
+
+                VStack {
+                    Spacer()
+                    VoiceCaptureView(
+                        onCreated: { message in withAnimation { toastMessage = message } },
+                        onNeedsDate: { title, transcript in pendingVoiceDraft = VoiceDraft(title: title, transcript: transcript) },
+                        onClose: closeVoiceCapture
+                    )
+                }
+                .transition(.move(edge: .bottom))
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            FloatingTabBar(
-                selectedTab: $selectedTab,
-                onMicrophone: { isCapturingVoice = true },
-                onManualEntry: { isAddingReminder = true }
-            )
-        }
+        .animation(.appSpring, value: isCapturingVoice)
+        // Dark status bar text would be unreadable over the dimmed app.
+        .statusBarHidden(isCapturingVoice)
         .overlay(alignment: .top) {
             if let toastMessage {
                 ToastView(message: toastMessage)
@@ -58,16 +59,6 @@ struct ContentView: View {
                         withAnimation { self.toastMessage = nil }
                     }
             }
-        }
-        .sheet(isPresented: $isCapturingVoice, onDismiss: {
-            // The form can only be presented once the voice sheet is gone.
-            voiceDraft = pendingVoiceDraft
-            pendingVoiceDraft = nil
-        }) {
-            VoiceCaptureView(
-                onCreated: { message in withAnimation { toastMessage = message } },
-                onNeedsDate: { title, transcript in pendingVoiceDraft = VoiceDraft(title: title, transcript: transcript) }
-            )
         }
         .sheet(item: $voiceDraft) { draft in
             ReminderFormView(
@@ -92,6 +83,9 @@ struct ContentView: View {
                 try? modelContext.save()
                 hasSeededDemoData = true
             }
+            #if DEBUG
+            applyDebugLaunchArguments()
+            #endif
             await notifications.requestAuthorization()
             await ParserService.shared.checkModel()
             // Safety net after a reinstall or a missed update.
@@ -118,6 +112,64 @@ struct ContentView: View {
             detailReminder = reminder
         }
     }
+
+    private var mainContent: some View {
+        ZStack {
+            AppBackground()
+
+            switch selectedTab {
+            case .day:
+                DayView(
+                    selectedDate: $selectedDate,
+                    onShowCalendar: { withAnimation(.appSpring) { selectedTab = .month } },
+                    onSelect: { detailReminder = $0 }
+                )
+            case .month:
+                MonthView(
+                    selectedDate: $selectedDate,
+                    onShowDay: { withAnimation(.appSpring) { selectedTab = .day } },
+                    onSelect: { detailReminder = $0 }
+                )
+            case .settings:
+                SettingsView()
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            FloatingTabBar(
+                selectedTab: $selectedTab,
+                onMicrophone: { isCapturingVoice = true },
+                onManualEntry: { isAddingReminder = true }
+            )
+        }
+    }
+
+    /// A dictation without a date continues in the form once the panel is closed.
+    private func closeVoiceCapture() {
+        isCapturingVoice = false
+        voiceDraft = pendingVoiceDraft
+        pendingVoiceDraft = nil
+    }
+
+    #if DEBUG
+    /// Screenshot helper: `-uiTab month|settings` and `-uiScreen capture|detail|form`.
+    private func applyDebugLaunchArguments() {
+        let defaults = UserDefaults.standard
+        switch defaults.string(forKey: "uiTab") {
+        case "month": selectedTab = .month
+        case "settings": selectedTab = .settings
+        default: break
+        }
+        switch defaults.string(forKey: "uiScreen") {
+        case "capture": isCapturingVoice = true
+        case "form": isAddingReminder = true
+        case "detail":
+            let descriptor = FetchDescriptor<Reminder>(sortBy: [SortDescriptor(\.dueDate)])
+            let reminders = (try? modelContext.fetch(descriptor)) ?? []
+            detailReminder = reminders.first { Calendar.app.isDate($0.dueDate, inSameDayAs: selectedDate) } ?? reminders.first
+        default: break
+        }
+    }
+    #endif
 
     /// remindersint://capture opens the dictation, remindersint://reminder/<uuid> a detail.
     private func handleDeepLink(_ url: URL) {

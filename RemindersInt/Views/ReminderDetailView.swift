@@ -95,17 +95,18 @@ struct ReminderDetailView: View {
 
     private func statusButton(_ title: String, systemImage: String, color: Color, status: ReminderStatus) -> some View {
         Button {
-            NotificationService.shared.setStatus(status, for: reminder)
+            withAnimation(.appSpring) { NotificationService.shared.setStatus(status, for: reminder) }
             dismiss()
         } label: {
             Label(title, systemImage: systemImage)
                 .font(.headline)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
-                .contentShape(.capsule)
+                .frame(height: 48)
+                .contentShape(.rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(color).interactive(), in: .capsule)
+        .glassEffect(.regular.tint(color).interactive(), in: .rect(cornerRadius: 16))
+        .glassRim(.rect(cornerRadius: 16), opacity: 0.5)
     }
 }
