@@ -38,7 +38,7 @@ Comptes, synchronisation, cloud, partage, Android, pièces jointes, Siri, Apple 
 - Services :
   - NotificationService : planifie, annule et replanifie les notifications locales des TaskItem en attente et datés ; relances selon repeatInterval pour les rappels, notification unique pour les tâches
   - SpeechService : transcription voix -> texte
-  - ParserService : texte -> ParsedCapture via Foundation Models : intention (reminder / task ; session et goal prévus, non produits), titre, date/heure absolue, intervalle de relance, jusqu'à 3 espaces probables avec confiance. Date de référence = maintenant, en Europe/Paris, français. Un rappel sans date fait demander la date plutôt que d'inventer ; une tâche peut rester sans date.
+  - ParserService : texte -> ParsedCapture via Foundation Models : intention (reminder / task / sessionStart / sessionStop / sessionLog / goalProgress), titre, date/heure absolue, intervalle de relance, jusqu'à 3 espaces probables avec confiance. Date de référence = maintenant, en Europe/Paris, français. Un rappel sans date fait demander la date plutôt que d'inventer ; une tâche peut rester sans date.
   - SpaceRouter : routage de secours par mots-clés sur les noms d'espaces et leurs synonymes. Seuil de confiance 0,6.
   - TrackingService : démarrer / arrêter / enregistrer / modifier une session, Live Activity (ActivityKit, mise à jour locale), notification « Toujours sur … ? » après 4 h, rappel « Rien tracké aujourd'hui » à 20 h.
 
@@ -75,6 +75,7 @@ La semaine d'usage réel de la V1 se fait en parallèle de la V2.
 - [x] Étape 6a : Espaces (arbre), TaskItem (généralise Reminder), hub et détail d'espace, routage vocal intention + espace, toast « Changer ».
 - [x] Étape 6b : Suivi du temps (sessions par espace, onglet Suivi, statistiques, Live Activity, « Temps tracké » du hub, intentions de session).
 - [x] Étape 6c : Objectifs par espace (bloc Objectifs, objectif le plus urgent dans le hub, cibles hebdo dans Suivi, tuile et vue d'ensemble dans les stats, pastille « Objectif » dans la Vue Jour, intention `goalProgress`).
+V2 livrée, tag `v0.2.0`.
 
 ## Décisions prises en cours de route
 - Étape 2 : compteur remindersSent = notifications délivrées, première incluse (libellé « Notifications envoyées »). Rattrapage app fermée par calcul des heures passées. Suppression : swipe complet à gauche (avec confirmation) et bouton dans le détail.
@@ -104,7 +105,9 @@ La semaine d'usage réel de la V1 se fait en parallèle de la V2.
 - Arguments DEBUG : `-seedDemoGoals YES` (3 objectifs de chaque type, une fois), `-uiDayOffset <n>`, `-seedDemoSessions YES` (deux semaines de sessions, une fois), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <nom>`, `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (passe par le champ « Simuler une dictée »), `-parserSelfTest YES` (tableau dans la console), `-uiNoPrompt YES` (pas de demande d'autorisation des notifications, pour les captures).
 
 ## Tests à faire sur iPhone physique
-Non vérifiables sur simulateur :
+Non vérifiables sur simulateur, à passer avec la V2 (`v0.2.0`) installée sur l'iPhone.
+
+Socle V1 :
 - Micro et transcription en direct (le simulateur reste sur « Micro inactif »), barre d'onde, reconnaissance on-device fr-FR.
 - Foundation Models : Apple Intelligence est désactivé sur le Mac de dev, donc toutes les extractions testées viennent du parser de secours. Vérifier titres, dates (« jeudi prochain à 16h », « ce soir »…) et intervalles extraits par le modèle, et que la note de Réglages n'apparaît pas.
 - Notifications : appui long sur la notification pour afficher Annuler / Fait sur l'écran verrouillé, relances réelles toutes les 5 / 15 / 30 / 60 min, son.
@@ -112,6 +115,19 @@ Non vérifiables sur simulateur :
 - Widget « Prochain rappel » sur l'écran verrouillé : rendu avec préfixe « Rappel · » / « Tâche · », mise à jour après création / Fait / suppression, ouverture du détail au tap.
 - Signature avec l'Apple ID gratuit : la capacité App Groups doit être acceptée par le profil de l'équipe personnelle (sinon, le widget « Prochain rappel » ne reçoit plus de données ; le contrôle reste fonctionnel quand l'intent s'exécute dans l'app).
 - Appui long sur le micro vert (formulaire manuel) et retour haptique.
-- Étape 6c : +1 et Annuler du toast au doigt, cercle atteint et sous-étapes, balayage « Archiver », formulaire d'objectif (segmented, unité, période, échéance, étapes), routage Foundation Models des phrases goalProgress.
-- Étape 6b : Live Activity sur l'écran verrouillé (non capturable automatiquement au simulateur : Cmd-L dans Simulator), Dynamic Island étendue, bouton Stop de l'activité app fermée, notification « Toujours sur … ? » avec Continuer / Arrêter maintenant, rappel de 20 h, routage Foundation Models des phrases de session.
-- Étape 6a : première ouverture avec le store V1 du téléphone, les rappels existants doivent réapparaître (sans espace) avec leurs notifications. Routage Foundation Models (intention, chemin, confiance) sur les 10 phrases de `ParserSelfTest` et des phrases réelles. Réordonnancement du hub par appui long, archivage par balayage, « Changer » et les puces du toast, cercle Fait dans le détail d'espace.
+
+Étape 6a (espaces) :
+- Première ouverture avec le store V1 du téléphone : les rappels existants doivent réapparaître (sans espace) avec leurs notifications.
+- Routage Foundation Models (intention, chemin, confiance) sur les 10 phrases de `ParserSelfTest` et des phrases réelles.
+- Réordonnancement du hub par appui long, archivage par balayage, « Changer » et les puces du toast, cercle Fait dans le détail d'espace.
+
+Étape 6b (suivi du temps) :
+- Live Activity sur l'écran verrouillé (non capturable automatiquement au simulateur : Cmd-L dans Simulator), Dynamic Island compacte et étendue, bouton Stop de l'activité app fermée.
+- Notification « Toujours sur … ? » avec Continuer / Arrêter maintenant, rappel « Rien tracké aujourd'hui » de 20 h.
+- Routage Foundation Models des phrases de session (`sessionStart`, `sessionStop`, `sessionLog`).
+
+Étape 6c (objectifs) :
+- +1 et Annuler du toast au doigt, cercle atteint et sous-étapes, balayage « Archiver » des objectifs.
+- Formulaire d'objectif (segmented, unité, période, échéance, étapes), compteur ajustable.
+- Remise à zéro d'un compteur hebdo / mensuel au changement réel de période (lundi, 1er du mois).
+- Routage Foundation Models des phrases `goalProgress`.
