@@ -23,6 +23,10 @@ struct CaptureOutcome: Identifiable {
         /// Several counters match: the toast asks which one.
         case goalChoice([Goal])
         case goalNotFound
+        /// A prayer ticked by voice.
+        case prayerChecked(name: String, status: PrayerStatus, isYesterday: Bool)
+        /// No space runs the prayer module.
+        case prayerUnavailable
     }
 
     let id = UUID()
@@ -111,6 +115,16 @@ struct CaptureToastView: View {
             return "+1 · Quel objectif ?"
         case .goalNotFound:
             return "Aucun objectif compteur"
+        case .prayerChecked(let name, let status, let isYesterday):
+            let label = isYesterday ? "\(name) d'hier" : name
+            return switch status {
+            case .onTime: "\(label) · à l'heure"
+            case .late: "\(label) · en retard"
+            case .madeUp: "\(label) · rattrapée"
+            case .missed, .pending: label
+            }
+        case .prayerUnavailable:
+            return "Module Prière inactif"
         }
     }
 
@@ -122,7 +136,7 @@ struct CaptureToastView: View {
         case .pendingSession(let pending):
             pending.end.map { "\(pending.start.formatted(Self.timeStyle)) – \($0.formatted(Self.timeStyle))" }
         case .goalProgress(let goal), .goalUndone(let goal): GoalMath.valueLabel(goal, sessions: [], now: .now)
-        case .sessionStopped, .goalChoice, .goalNotFound: nil
+        case .sessionStopped, .goalChoice, .goalNotFound, .prayerChecked, .prayerUnavailable: nil
         }
         guard let prefix else { return outcome.transcript }
         return "\(prefix) · \(outcome.transcript)"
@@ -132,7 +146,9 @@ struct CaptureToastView: View {
         if outcome.asksForSpace { return ("questionmark.circle.fill", .white) }
         switch outcome.kind {
         case .goalChoice: return ("questionmark.circle.fill", .white)
-        case .goalNotFound, .goalUndone: return ("info.circle.fill", .white)
+        case .goalNotFound, .goalUndone, .prayerUnavailable: return ("info.circle.fill", .white)
+        case .prayerChecked(_, let status, _):
+            return ("checkmark.circle.fill", status == .late ? PrayerModuleView.orange : status == .madeUp ? .white : Palette.green)
         case .goalProgress: return ("plus.circle.fill", Palette.green)
         case .sessionStarted: return ("play.circle.fill", Palette.green)
         case .sessionStopped(let session): return session == nil ? ("info.circle.fill", .white) : ("stop.circle.fill", Palette.red)

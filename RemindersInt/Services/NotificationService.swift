@@ -18,6 +18,8 @@ final class NotificationService: NSObject {
     nonisolated static let reminderIDKey = "reminderID"
     nonisolated static let indexKey = "index"
     private static let maxPendingRequests = 64
+    /// Kept free for the tracking reminders ("Toujours sur … ?" and the 7 evening reminders).
+    private static let trackingReserve = 10
 
     /// Set when the user taps a notification; the root view opens the matching detail.
     var taskToOpen: UUID?
@@ -50,7 +52,7 @@ final class NotificationService: NSObject {
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([category, TrackingService.notificationCategory])
+        center.setNotificationCategories([category, TrackingService.notificationCategory, PrayerService.notificationCategory])
     }
 
     /// iOS only shows the prompt once; later calls return the stored answer.
@@ -98,14 +100,20 @@ final class NotificationService: NSObject {
         refreshWidget()
     }
 
-    /// Rebuilds every pending request from the store, keeping the 64 soonest overall.
+    /// Rebuilds the task requests from the store, soonest first, within what iOS allows once
+    /// the tracking and prayer notifications are counted. Only task identifiers are removed:
+    /// the other services keep theirs.
     func rescheduleAllPending() {
-        center.removeAllPendingNotificationRequests()
+        let all = (try? modelContainer?.mainContext.fetch(FetchDescriptor<TaskItem>())) ?? []
+        center.removePendingNotificationRequests(withIdentifiers: all.flatMap { task in
+            (0...Self.maxFollowUps).map { Self.identifier(for: task.id, index: $0) }
+        })
         let now = Date.now
+        let budget = Self.maxPendingRequests - Self.trackingReserve - (PrayerService.shared.isActive ? PrayerService.notificationBudget : 0)
         let items = pendingReminders()
             .flatMap { requests(for: $0, after: now) }
             .sorted { $0.date < $1.date }
-            .prefix(Self.maxPendingRequests)
+            .prefix(budget)
         for item in items {
             center.add(item.request)
         }
@@ -304,6 +312,8 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         Task { @MainActor in
             if category == TrackingService.longSessionCategory {
                 TrackingService.shared.handleNotificationResponse(action: action)
+            } else if PrayerService.isPrayerNotification(identifier) {
+                PrayerService.shared.handleNotificationResponse(action: action, identifier: identifier)
             } else if TrackingService.isDailyReminder(identifier) {
                 TrackingService.shared.handleDailyReminderTap()
             } else {

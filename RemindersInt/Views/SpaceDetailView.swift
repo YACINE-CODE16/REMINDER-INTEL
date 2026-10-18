@@ -15,6 +15,8 @@ struct SpaceDetailView: View {
     @State private var isAddingTask = false
     @State private var isAddingGoal = false
     @State private var editedGoal: Goal?
+    @State private var isShowingPrayerSettings = false
+    @State private var prayerLocationRefused = false
 
     /// Active goals of the subtree, most urgent first.
     private var goals: [Goal] {
@@ -44,6 +46,10 @@ struct SpaceDetailView: View {
             if !space.sortedChildren.isEmpty {
                 chips
                     .glassListRow(bottom: 10)
+            }
+            if space.activeModule == .prayer, let settings = space.prayerSettings {
+                PrayerModuleView(settings: settings, color: space.color)
+                    .glassListRow(top: 8, bottom: 4)
             }
 
             sectionHeader("Objectifs") {
@@ -135,6 +141,14 @@ struct SpaceDetailView: View {
                 }
                 .accessibilityLabel("Nouvelle tâche dans \(space.name)")
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                moduleMenu
+            }
+        }
+        .sheet(isPresented: $isShowingPrayerSettings) {
+            if let settings = space.prayerSettings {
+                PrayerSettingsView(settings: settings, locationRefused: prayerLocationRefused)
+            }
         }
         .sheet(isPresented: $isAddingTask) {
             TaskFormView(
@@ -153,9 +167,45 @@ struct SpaceDetailView: View {
         }
     }
 
+    // MARK: - Module
+
+    private var moduleMenu: some View {
+        Menu {
+            if space.activeModule == .prayer {
+                Button("Réglages Prière", systemImage: "slider.horizontal.3") { isShowingPrayerSettings = true }
+                Button("Désactiver le module", systemImage: "xmark.circle", role: .destructive) {
+                    PrayerService.shared.deactivate(space)
+                }
+            } else if let other = PrayerService.shared.prayerSpace(), other.id != space.id {
+                Text("Module Prière actif dans \(other.name)")
+            } else {
+                Button("Activer le module Prière", systemImage: "moon.stars") {
+                    Task { await Self.activatePrayer(on: space, refused: $prayerLocationRefused, showSettings: $isShowingPrayerSettings) }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("Module de l'espace")
+    }
+
+    /// Switches the module on, then asks CoreLocation once; refused → settings with city search.
+    static func activatePrayer(on space: Space, refused: Binding<Bool>? = nil, showSettings: Binding<Bool>? = nil) async {
+        guard let settings = PrayerService.shared.activate(on: space) else { return }
+        if let place = await PrayerLocator.currentPlace() {
+            PrayerLocator.apply(place, to: settings)
+        } else {
+            refused?.wrappedValue = true
+            showSettings?.wrappedValue = true
+        }
+    }
+
     // MARK: - Header
 
     private var subtitle: String {
+        if space.activeModule == .prayer, let settings = space.prayerSettings {
+            return settings.summary
+        }
         let count = pending.count
         let overdue = pending.filter { $0.isOverdue() }.count
         var text = SpaceCard.taskCount(count)

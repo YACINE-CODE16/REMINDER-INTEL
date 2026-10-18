@@ -148,6 +148,11 @@ struct VoiceCaptureView: View {
                 onClose()
                 return
             }
+            if parsed.intent == .prayerCheck, let check = parsed.prayerCheck {
+                onCreated(Self.handlePrayer(check, transcript: text))
+                onClose()
+                return
+            }
             if parsed.intent == .goalProgress {
                 let goals = (try? modelContext.fetch(FetchDescriptor<Goal>())) ?? []
                 let guessed = parsed.spaceGuesses.compactMap { guess in spaces.first { $0.id == guess.space.id } }
@@ -202,6 +207,32 @@ struct VoiceCaptureView: View {
             }
             return CaptureOutcome(kind: .sessionStarted(session), transcript: transcript, proposals: [])
         }
+    }
+
+    /// Ticks the prayer of today, or of yesterday ("d'hier", or Isha said before today's Fajr).
+    static func handlePrayer(_ check: PrayerCheck, transcript: String, now: Date = .now) -> CaptureOutcome {
+        let service = PrayerService.shared
+        guard let settings = service.settings() else {
+            return CaptureOutcome(kind: .prayerUnavailable, transcript: transcript, proposals: [])
+        }
+        let calendar = Calendar.app
+        let today = calendar.startOfDay(for: now)
+        var isYesterday = check.isYesterday
+        if !isYesterday, check.prayer == .isha, now < service.times(on: today, settings: settings).fajr {
+            isYesterday = true
+        }
+        let day = isYesterday ? (calendar.date(byAdding: .day, value: -1, to: today) ?? today) : today
+        let mark: PrayerMark = switch check.mark {
+        case .done: .auto
+        case .onTime: .onTime
+        case .late: .late
+        case .madeUp: .madeUp
+        }
+        guard let record = service.check(check.prayer, on: day, at: now, mark: mark) else {
+            return CaptureOutcome(kind: .prayerUnavailable, transcript: transcript, proposals: [])
+        }
+        let name = check.prayer.name(on: day, calendar: calendar)
+        return CaptureOutcome(kind: .prayerChecked(name: name, status: record.status, isYesterday: isYesterday), transcript: transcript, proposals: [])
     }
 
     /// +1 on the counter goal the sentence points to: by its title or unit ("club" → "clubs"),

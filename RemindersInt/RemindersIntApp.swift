@@ -15,13 +15,14 @@ struct RemindersIntApp: App {
     init() {
         do {
             // Reminder stays in the schema only so V1 stores can be migrated.
-            container = try ModelContainer(for: TaskItem.self, Space.self, Session.self, Goal.self, GoalStep.self, Reminder.self)
+            container = try ModelContainer(for: TaskItem.self, Space.self, Session.self, Goal.self, GoalStep.self, PrayerSettings.self, PrayerRecord.self, Reminder.self)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
         StoreSetup.run(in: container.mainContext)
         NotificationService.shared.configure(with: container)
         TrackingService.shared.configure(with: container)
+        PrayerService.shared.configure(with: container)
     }
 
     var body: some Scene {

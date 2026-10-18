@@ -17,6 +17,8 @@ nonisolated struct ParsedCapture: Sendable, Equatable {
     var repeatInterval: RepeatInterval?
     /// Length of a past session (sessionLog).
     var duration: TimeInterval? = nil
+    /// Which prayer and how (prayerCheck).
+    var prayerCheck: PrayerCheck? = nil
     var confidence: Double
     /// Most likely spaces, best first; empty when nothing fits.
     var spaceGuesses: [SpaceGuess]
@@ -29,6 +31,22 @@ nonisolated struct ParsedCapture: Sendable, Equatable {
     }
 
     var spaceConfidence: Double { spaceGuesses.first?.confidence ?? 0 }
+}
+
+/// A dictated prayer tick: "j'ai fait dhuhr", "asr en retard", "j'ai rattrapé isha d'hier".
+nonisolated struct PrayerCheck: Sendable, Equatable {
+    enum Mark: Sendable {
+        /// On time or late, from the clock.
+        case done
+        case onTime
+        case late
+        case madeUp
+    }
+
+    var prayer: Prayer
+    var mark: Mark
+    /// "d'hier", "hier".
+    var isYesterday: Bool
 }
 
 extension Calendar {
@@ -104,6 +122,15 @@ final class ParserService {
     /// and the keyword guesses are used when the model returns none.
     private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef]) -> ParsedCapture {
         let base = fallback.capture
+        // Prayer names are unambiguous: the rule-based reading wins, the model fills a gap.
+        if generated.intent == .prayerCheck || base.intent == .prayerCheck {
+            let rules = base.prayerCheck
+            guard let prayer = rules?.prayer ?? generated.prayer.prayer else { return base }
+            var mark = rules?.mark ?? generated.prayerMark.mark
+            if mark == .done, generated.prayerMark.mark != .done { mark = generated.prayerMark.mark }
+            let check = PrayerCheck(prayer: prayer, mark: mark, isYesterday: (rules?.isYesterday ?? false) || generated.prayerYesterday)
+            return ParsedCapture(intent: .prayerCheck, title: prayer.name, dueDate: nil, repeatInterval: nil, prayerCheck: check, confidence: generated.confidence, spaceGuesses: [], engine: .foundationModels)
+        }
         let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelDate = Self.date(from: generated.dueDate)
         let dueDate = fallback.isRelativeOffset ? base.dueDate : (modelDate ?? base.dueDate)
@@ -185,6 +212,10 @@ final class ParserService {
           sessionStop quand on arrête l'activité en cours (« j'arrête », « stop », « fini », « je fais une pause »).
           sessionLog quand on raconte un temps déjà passé avec une durée (« j'ai fait 2h de maths ce matin », « hier j'ai bossé 45 min sur FieldZ »).
           goalProgress quand on annonce une unité de plus vers un objectif compteur (« j'ai signé un club », « séance faite », « un de plus », « encore un test blanc »).
+          prayerCheck quand on coche une prière (« j'ai fait dhuhr », « fajr fait », « asr en retard », « j'ai rattrapé isha d'hier »). Noms acceptés : fajr ou sobh, dhuhr ou dohr, asr, maghrib, isha ou icha.
+        - prayer : pour prayerCheck, la prière (fajr, dhuhr, asr, maghrib, isha) ; none sinon.
+        - prayerMark : done si la prière est simplement faite, onTime si « à l'heure » est dit, late si « en retard », madeUp si « rattrapé ».
+        - prayerYesterday : true si la prière est celle d'hier (« d'hier », « hier »).
         - durationMinutes : pour sessionLog, la durée en minutes (« 2h » = 120, « 1h30 » = 90) ; 0 sinon.
           Pour sessionLog, dueDate est le début de la session si un moment est donné (« ce matin » = 09:00, « hier soir » = 19:00 la veille), sinon chaîne vide. Pour sessionStart et sessionStop, dueDate est une chaîne vide.
         - spaces : jusqu'à 3 espaces les plus probables parmi la liste ci-dessous, du plus probable au moins probable.
@@ -221,6 +252,53 @@ nonisolated struct GeneratedCapture {
 
     @Guide(description: "Jusqu'à 3 espaces probables, chemin recopié de la liste, du plus probable au moins probable", .maximumCount(3))
     var spaces: [GeneratedSpaceGuess]
+
+    @Guide(description: "Pour prayerCheck, la prière cochée ; none sinon")
+    var prayer: GeneratedPrayer
+
+    @Guide(description: "Pour prayerCheck : done, onTime (« à l'heure »), late (« en retard ») ou madeUp (« rattrapé »)")
+    var prayerMark: GeneratedPrayerMark
+
+    @Guide(description: "Pour prayerCheck, true si c'est la prière d'hier")
+    var prayerYesterday: Bool
+}
+
+@Generable
+nonisolated enum GeneratedPrayer {
+    case none
+    case fajr
+    case dhuhr
+    case asr
+    case maghrib
+    case isha
+
+    var prayer: Prayer? {
+        switch self {
+        case .none: nil
+        case .fajr: .fajr
+        case .dhuhr: .dhuhr
+        case .asr: .asr
+        case .maghrib: .maghrib
+        case .isha: .isha
+        }
+    }
+}
+
+@Generable
+nonisolated enum GeneratedPrayerMark {
+    case done
+    case onTime
+    case late
+    case madeUp
+
+    var mark: PrayerCheck.Mark {
+        switch self {
+        case .done: .done
+        case .onTime: .onTime
+        case .late: .late
+        case .madeUp: .madeUp
+        }
+    }
 }
 
 @Generable
@@ -240,6 +318,7 @@ nonisolated enum GeneratedIntent {
     case sessionStop
     case sessionLog
     case goalProgress
+    case prayerCheck
 
     var intent: CaptureIntent {
         switch self {
@@ -249,6 +328,7 @@ nonisolated enum GeneratedIntent {
         case .sessionStop: .sessionStop
         case .sessionLog: .sessionLog
         case .goalProgress: .goalProgress
+        case .prayerCheck: .prayerCheck
         }
     }
 }

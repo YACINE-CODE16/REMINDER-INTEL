@@ -14,6 +14,8 @@ nonisolated enum CaptureIntent: String, Sendable, Equatable {
     case sessionLog
     /// "Un club de plus", "séance faite": +1 on a counter goal.
     case goalProgress
+    /// "J'ai fait dhuhr", "asr en retard", "j'ai rattrapé isha d'hier": ticks a prayer (prayer.check).
+    case prayerCheck
 
     var isSession: Bool { self == .sessionStart || self == .sessionStop || self == .sessionLog }
 }

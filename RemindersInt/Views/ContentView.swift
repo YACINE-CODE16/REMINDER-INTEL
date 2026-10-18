@@ -26,6 +26,7 @@ struct ContentView: View {
 
     private let notifications = NotificationService.shared
     private let tracking = TrackingService.shared
+    private let prayers = PrayerService.shared
     private let captureRequests = VoiceCaptureRequests.shared
 
     var body: some View {
@@ -109,11 +110,13 @@ struct ContentView: View {
             await ParserService.shared.checkModel()
             // Safety net after a reinstall or a missed update.
             notifications.rescheduleAllPending()
+            prayers.resume()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }
             notifications.syncSentCounts()
             tracking.resume()
+            prayers.resume()
             // Lock screen control whose intent ran in the widget extension.
             if captureRequests.takePending() { openVoiceCapture() }
         }
@@ -125,6 +128,9 @@ struct ContentView: View {
         .onChange(of: tracking.showTrackingRequests) {
             closeSheets()
             selectedTab = .tracking
+        }
+        .onChange(of: prayers.showPrayerSpaceRequests) {
+            openPrayerSpace()
         }
         .onChange(of: notifications.taskToOpen, initial: true) { _, id in
             guard let id else { return }
@@ -271,7 +277,7 @@ struct ContentView: View {
 
     #if DEBUG
     /// Screenshot and test helpers:
-    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
+    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-seedDemoPrayer YES` ("Prière" space, 20 weeks of prayers, once; `-resetDemoPrayer YES` first to redo it), `-prayerNotificationTest YES` (adhan in 5 s + follow-up), `-prayerLogNotifications YES` (prints pending prayer requests), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
     /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
     /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
     private func applyDebugLaunchArguments() async {
@@ -281,6 +287,27 @@ struct ContentView: View {
         }
         if defaults.bool(forKey: "seedDemoGoals") {
             DemoGoals.insert(into: modelContext)
+        }
+        if defaults.bool(forKey: "resetDemoPrayer") {
+            DemoPrayer.reset(in: modelContext)
+        }
+        if defaults.bool(forKey: "seedDemoPrayer") {
+            DemoPrayer.insert(into: modelContext)
+            prayers.refresh()
+        }
+        if defaults.bool(forKey: "prayerNotificationTest") {
+            // Once the launch has answered authorization and rebuilt the real requests.
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                prayers.scheduleTestNotifications()
+            }
+        }
+        if defaults.bool(forKey: "prayerLogNotifications") {
+            // After the launch rescheduling, which runs once authorization is answered.
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                await PrayerService.logPendingRequests()
+            }
         }
         switch defaults.string(forKey: "uiTab") {
         case "month": selectedTab = .month
@@ -336,6 +363,8 @@ struct ContentView: View {
         case "tracking":
             closeSheets()
             selectedTab = .tracking
+        case "prayer":
+            openPrayerSpace()
         case "reminder":
             if let id = UUID(uuidString: url.lastPathComponent) {
                 notifications.taskToOpen = id
@@ -349,6 +378,20 @@ struct ContentView: View {
     private func openVoiceCapture() {
         closeSheets()
         isCapturingVoice = true
+    }
+
+    /// Notification or widget tap: the space running the prayer module, in the Espaces tab.
+    private func openPrayerSpace() {
+        closeSheets()
+        selectedTab = .spaces
+        guard let space = prayers.prayerSpace() else { return }
+        var chain: [Space] = []
+        var current: Space? = space
+        while let node = current {
+            chain.insert(node, at: 0)
+            current = node.parent
+        }
+        spacesPath = chain
     }
 
     private func closeSheets() {

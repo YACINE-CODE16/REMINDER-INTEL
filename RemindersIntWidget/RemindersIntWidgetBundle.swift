@@ -7,5 +7,7 @@ struct RemindersIntWidgetBundle: WidgetBundle {
         VoiceCaptureControl()
         NextReminderWidget()
         SessionLiveActivity()
+        NextPrayerWidget()
+        CheckPrayerControl()
     }
 }

@@ -12,4 +12,6 @@ nonisolated enum AppGroup {
 nonisolated enum WidgetKind {
     static let nextReminder = "com.yacine.RemindersInt.nextReminder"
     static let voiceCapture = "com.yacine.RemindersInt.voiceCapture"
+    static let nextPrayer = "com.yacine.RemindersInt.nextPrayer"
+    static let checkPrayer = "com.yacine.RemindersInt.checkPrayer"
 }

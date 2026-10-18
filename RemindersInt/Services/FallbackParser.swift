@@ -27,6 +27,10 @@ nonisolated struct FallbackParser {
     private static let weekdays = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
 
     func parse(_ text: String) -> Output {
+        if let check = Self.prayerCheck(in: text) {
+            let capture = ParsedCapture(intent: .prayerCheck, title: check.prayer.name, dueDate: nil, repeatInterval: nil, prayerCheck: check, confidence: 0.8, spaceGuesses: [], engine: .fallback)
+            return Output(capture: capture, isRelativeOffset: false)
+        }
         var rest = text
         // Session sentences first: "j'ai fait 2h" must not be read as 02:00.
         var sessionIntent = Self.sessionIntent(of: text)
@@ -135,6 +139,39 @@ nonisolated struct FallbackParser {
             engine: .fallback
         )
         return Output(capture: capture, isRelativeOffset: minutesOffset != nil)
+    }
+
+    // MARK: - Prayers
+
+    private static let prayerNames: [(Prayer, String)] = [
+        (.fajr, #"fajr|fadjr|fajar|sobh|sobhi|subh|sobeh"#),
+        (.dhuhr, #"dhuhr|dhohr|dohr|dhor|duhr|zohr|zuhr|jumu['’]?a|joumou['’]?a"#),
+        (.asr, #"asr|asser|aser"#),
+        (.maghrib, #"maghrib|maghreb|magrib"#),
+        (.isha, #"isha|icha|ichaa|ishaa"#),
+    ]
+    private static let prayerDoneMarkers = #"\bfaite?s?\b|\bpri[ée]e?\b|\baccompli|\bvalid[ée]|\bok\b|[àa] l['’]heure|en retard|rattrap"#
+
+    /// "J'ai fait dhuhr", "fajr fait", "asr en retard", "j'ai rattrapé isha d'hier".
+    /// Needs a prayer name and a tick word; "rappelle-moi…" stays a reminder.
+    static func prayerCheck(in text: String) -> PrayerCheck? {
+        let options: String.CompareOptions = [.regularExpression, .caseInsensitive]
+        guard text.range(of: prayerDoneMarkers, options: options) != nil,
+              text.range(of: reminderMarkers, options: options) == nil,
+              let prayer = prayerNames.first(where: { text.range(of: #"(?<![\p{L}])(?:"# + $0.1 + #")(?![\p{L}])"#, options: options) != nil })?.0
+        else { return nil }
+        let mark: PrayerCheck.Mark
+        if text.range(of: "rattrap", options: options) != nil {
+            mark = .madeUp
+        } else if text.range(of: "en retard", options: options) != nil {
+            mark = .late
+        } else if text.range(of: #"[àa] l['’]heure"#, options: options) != nil {
+            mark = .onTime
+        } else {
+            mark = .done
+        }
+        let isYesterday = text.range(of: #"\bhier\b"#, options: options) != nil
+        return PrayerCheck(prayer: prayer, mark: mark, isYesterday: isYesterday)
     }
 
     private static let startMarkers = #"\bje commence\b|\bje me mets\b|\bje m['’]y mets\b|\bje d[ée]marre\b|\bc['’]est parti\b|\bje m['’]attaque\b|\bje lance (?:une|la|le) (?:session|chrono)"#

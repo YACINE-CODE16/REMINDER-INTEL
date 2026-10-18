@@ -10,6 +10,7 @@ struct SpaceFormView: View {
     @State private var colorHex = SpaceStyle.colors[0]
     @State private var symbol = SpaceStyle.symbols[0]
     @State private var parent: Space?
+    @State private var module: SpaceModule = .none
     @FocusState private var isNameFocused: Bool
 
     private static let rowBackground = Color.white.opacity(0.7)
@@ -29,6 +30,25 @@ struct SpaceFormView: View {
                             .focused($isNameFocused)
                     }
                     SpacePickerRow(selection: $parent, title: "Parent")
+                }
+                .listRowBackground(Self.rowBackground)
+
+                Section {
+                    Picker("Module", selection: $module) {
+                        ForEach(SpaceModule.available) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .onChange(of: module) { _, newValue in
+                        if let hex = newValue.colorHex { colorHex = hex }
+                        if let moduleSymbol = newValue.symbol { symbol = moduleSymbol }
+                    }
+                } footer: {
+                    if module == .prayer, let other = PrayerService.shared.prayerSpace() {
+                        Text("Le module Prière est déjà actif dans \(other.name) : il y sera désactivé.")
+                    } else {
+                        Text("Un module ajoute un écran dédié en haut de l'espace, sans retirer tâches, temps ni objectifs.")
+                    }
                 }
                 .listRowBackground(Self.rowBackground)
 
@@ -114,6 +134,11 @@ struct SpaceFormView: View {
         )
         modelContext.insert(space)
         try? modelContext.save()
+        if module == .prayer {
+            // One prayer module at a time.
+            if let other = PrayerService.shared.prayerSpace() { PrayerService.shared.deactivate(other) }
+            Task { await SpaceDetailView.activatePrayer(on: space) }
+        }
         dismiss()
     }
 }

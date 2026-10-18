@@ -13,10 +13,13 @@ final class Space {
     var isArchived: Bool
     var createdAt: Date
     var parent: Space?
+    /// nil = no module (see `activeModule`).
+    var module: SpaceModule?
     @Relationship(deleteRule: .cascade, inverse: \Space.parent) var children: [Space] = []
     @Relationship(deleteRule: .nullify, inverse: \TaskItem.space) var tasks: [TaskItem] = []
     @Relationship(deleteRule: .cascade, inverse: \Session.space) var sessions: [Session] = []
     @Relationship(deleteRule: .cascade, inverse: \Goal.space) var goals: [Goal] = []
+    @Relationship(deleteRule: .cascade, inverse: \PrayerSettings.space) var prayerSettings: PrayerSettings?
 
     init(
         id: UUID = UUID(),
