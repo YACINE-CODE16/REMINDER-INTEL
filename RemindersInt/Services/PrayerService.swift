@@ -298,7 +298,7 @@ final class PrayerService {
     // MARK: - Stats
 
     struct Stats {
-        /// Consecutive days at 5/5, today included once complete.
+        /// Consecutive days at 5/5 on time or late (made up does not count), today included once complete.
         var streak: Int
         /// Prayers done / prayers called this month (since activation).
         var monthRatio: Double?
@@ -314,14 +314,21 @@ final class PrayerService {
     func stats(settings: PrayerSettings, records all: [PrayerRecord], now: Date = .now) -> Stats {
         let today = calendar.startOfDay(for: now)
         let activation = calendar.startOfDay(for: settings.activatedAt)
+        // Grid and month ratio count made-up prayers; the streak only counts prayers prayed in
+        // their day (on time or late).
         var doneByDay: [Date: Int] = [:]
+        var prayedInTimeByDay: [Date: Int] = [:]
         for record in all where record.status.isDone {
-            doneByDay[calendar.startOfDay(for: record.date), default: 0] += 1
+            let day = calendar.startOfDay(for: record.date)
+            doneByDay[day, default: 0] += 1
+            if record.status != .madeUp {
+                prayedInTimeByDay[day, default: 0] += 1
+            }
         }
 
         var streak = 0
-        var day = doneByDay[today] == 5 ? today : (calendar.date(byAdding: .day, value: -1, to: today) ?? today)
-        while doneByDay[day] == 5 {
+        var day = prayedInTimeByDay[today] == 5 ? today : (calendar.date(byAdding: .day, value: -1, to: today) ?? today)
+        while prayedInTimeByDay[day] == 5 {
             streak += 1
             day = calendar.date(byAdding: .day, value: -1, to: day) ?? day
         }
