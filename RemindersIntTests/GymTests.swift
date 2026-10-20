@@ -141,6 +141,32 @@ struct GymVoiceTests {
         #expect(current.gym?.exerciseID == nil)
     }
 
+    /// During a workout: a set needs a known exercise or an explicit set pattern.
+    @Test(arguments: [
+        "85 kilos 5 reps",
+        "80 x 8",
+        "Série de 12 à 20 kilos",
+        "Bench 90 kilos 3",
+        "Encore 10 répétitions à 60 kg",
+    ])
+    func setsDuringWorkout(_ phrase: String) {
+        let parsed = FallbackParser(now: .now, gym: Self.context).parse(phrase).capture
+        #expect(parsed.intent == .gymSet)
+    }
+
+    @Test(arguments: [
+        "Il faut que j'achète 5 kilos de riz",
+        "Acheter 2 kilos de pommes demain",
+        "J'ai perdu 3 kilos cette semaine",
+        "Réserver une table pour 4 à 20h",
+        "Envoyer 10 euros à Karim",
+    ])
+    func notSetsDuringWorkout(_ phrase: String) {
+        let parsed = FallbackParser(now: .now, gym: Self.context).parse(phrase).capture
+        #expect(!parsed.intent.isGym)
+        #expect(parsed.intent == .task || parsed.intent == .reminder)
+    }
+
     @Test(arguments: [
         "Rappelle-moi d'aller à la salle à 18h",
         "J'ai fait 2h de maths ce matin",

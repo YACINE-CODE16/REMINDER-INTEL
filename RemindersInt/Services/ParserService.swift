@@ -113,7 +113,7 @@ final class ParserService {
         for _ in 0..<2 {
             do {
                 let generated = try await generator(instructions, text)
-                return Self.merge(generated, fallback: fallback, spaces: spaces, gym: gym)
+                return Self.merge(generated, fallback: fallback, spaces: spaces, gym: gym, text: text)
             } catch {
                 if Self.isPermanent(error) {
                     generationFailed = true
@@ -162,10 +162,15 @@ final class ParserService {
     /// rule-based date fills in when the model returns none.
     /// Space paths the model returns are matched back to real spaces; unknown ones are dropped,
     /// and the keyword guesses are used when the model returns none.
-    private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef], gym: GymContext = .empty) -> ParsedCapture {
+    private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef], gym: GymContext = .empty, text: String = "") -> ParsedCapture {
         let base = fallback.capture
+        // A set proposed by the model alone needs a known exercise or an explicit set pattern,
+        // as for the rules.
+        let modelSetIsGrounded = generated.intent != .gymSet
+            || GymParsing.matchExercise(in: generated.gymExercise, exercises: gym.exercises) != nil
+            || GymParsing.hasExplicitSetPattern(text)
         // Gym: the rules read exercise names and numbers exactly; the model fills what they miss.
-        if base.intent.isGym || (gym.isModuleOn && generated.intent.intent.isGym) {
+        if base.intent.isGym || (gym.isModuleOn && generated.intent.intent.isGym && modelSetIsGrounded) {
             var command = base.gym ?? GymCommand()
             if command.exerciseID == nil, !generated.gymExercise.isEmpty {
                 command.exerciseID = GymParsing.matchExercise(in: generated.gymExercise, exercises: gym.exercises)?.id

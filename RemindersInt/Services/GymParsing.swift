@@ -89,11 +89,19 @@ nonisolated enum GymParsing {
         let exercise = matchExercise(in: text, exercises: context.exercises)
         command.exerciseID = exercise?.id
         let hasNumbers = command.weight != nil || command.reps != nil || command.seconds != nil || command.meters != nil || command.pair != nil || !command.bare.isEmpty
-        let hasExplicitSet = command.weight != nil || command.reps != nil || command.pair != nil
-        if (exercise != nil && hasNumbers) || (context.isWorkoutActive && hasExplicitSet) {
+        // A set needs an exercise of the library, or, on the current exercise of a running
+        // workout, an explicit set pattern: "il faut que j'achète 5 kilos de riz" stays a task.
+        if hasNumbers, exercise != nil || (context.isWorkoutActive && hasExplicitSetPattern(text)) {
             return (.gymSet, command)
         }
         return nil
+    }
+
+    private static let explicitSetPattern = #"\d+(?:[.,]\d+)?\s*[x×*]\s*\d+|(?<![\p{L}])s[ée]ries?(?![\p{L}])|(?<![\p{L}])(?:reps?|r[ée]p[ée]titions?|r[ée]ps?)(?![\p{L}])"#
+
+    /// "80 x 8", "série", "rep(s)", "répétitions".
+    static func hasExplicitSetPattern(_ text: String) -> Bool {
+        text.range(of: explicitSetPattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     /// The exercise whose name or alias appears in the sentence, longest match first
