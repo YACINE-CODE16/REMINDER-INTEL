@@ -73,9 +73,23 @@ final class ParserService {
     /// whose host Mac has Apple Intelligence off (the model assets are missing).
     private(set) var generationFailed = false
 
+    /// One call to the model: instructions and sentence in, structured capture out.
+    typealias Generator = @Sendable (_ instructions: String, _ text: String) async throws -> GeneratedCapture
+
+    @ObservationIgnored private let systemAvailability: @MainActor () -> Bool
+    @ObservationIgnored private let generator: Generator
+
+    init(
+        systemAvailability: @escaping @MainActor () -> Bool = { SystemLanguageModel.default.isAvailable },
+        generator: @escaping Generator = ParserService.generate
+    ) {
+        self.systemAvailability = systemAvailability
+        self.generator = generator
+    }
+
     /// Availability is read on each access: Apple Intelligence can be toggled while the app runs.
     var isModelAvailable: Bool {
-        SystemLanguageModel.default.isAvailable && !generationFailed
+        systemAvailability() && !generationFailed
     }
 
     /// Startup check: a one-token generation proves the model actually runs (and prewarms it).
@@ -84,39 +98,64 @@ final class ParserService {
         do {
             _ = try await LanguageModelSession().respond(to: "OK", options: GenerationOptions(maximumResponseTokens: 1))
         } catch {
-            recordFailure(error)
+            // Only a missing or unsupported model switches to simplified mode.
+            if Self.isPermanent(error) { generationFailed = true }
         }
     }
 
     func parse(_ text: String, spaces: [SpaceRef] = [], gym: GymContext = .empty, now: Date = .now) async -> ParsedCapture {
         let fallback = FallbackParser(now: now, spaces: spaces, gym: gym).parse(text)
         guard isModelAvailable else { return fallback.capture }
-        do {
-            let session = LanguageModelSession(instructions: Self.instructions(now: now, spaces: spaces, gym: gym))
-            let response = try await session.respond(
-                to: text,
-                generating: GeneratedCapture.self,
-                options: GenerationOptions(sampling: .greedy)
-            )
-            return Self.merge(response.content, fallback: fallback, spaces: spaces, gym: gym)
-        } catch {
-            // Degrade to the rule-based parser for this sentence.
-            recordFailure(error)
-            return fallback.capture
+        let instructions = Self.instructions(now: now, spaces: spaces, gym: gym)
+        // A transient error (decoding, rate limit, timeout…) is retried once; then this sentence
+        // alone uses the rule-based parser. Only a missing or unsupported model changes the
+        // global state.
+        for _ in 0..<2 {
+            do {
+                let generated = try await generator(instructions, text)
+                return Self.merge(generated, fallback: fallback, spaces: spaces, gym: gym)
+            } catch {
+                if Self.isPermanent(error) {
+                    generationFailed = true
+                    break
+                }
+            }
         }
+        return fallback.capture
     }
 
-    /// Errors tied to one sentence keep the model on; anything else switches to simplified mode.
-    private func recordFailure(_ error: any Error) {
+    nonisolated static func generate(instructions: String, text: String) async throws -> GeneratedCapture {
+        let session = LanguageModelSession(instructions: instructions)
+        let response = try await session.respond(
+            to: text,
+            generating: GeneratedCapture.self,
+            options: GenerationOptions(sampling: .greedy)
+        )
+        return response.content
+    }
+
+    /// The model cannot run here: assets missing or language / locale not supported.
+    /// Everything else (decoding, rate limit, guardrail, timeout…) is transient.
+    nonisolated static func isPermanent(_ error: any Error) -> Bool {
         if let generationError = error as? LanguageModelSession.GenerationError {
             switch generationError {
-            case .guardrailViolation, .exceededContextWindowSize:
-                return
+            case .assetsUnavailable, .unsupportedLanguageOrLocale:
+                return true
             default:
                 break
             }
         }
-        generationFailed = true
+        // Missing assets can also surface as a generic generation error wrapping the model
+        // manager's (simulator on a Mac without Apple Intelligence).
+        return wrapsMissingAssets(error as NSError)
+    }
+
+    nonisolated private static func wrapsMissingAssets(_ error: NSError, depth: Int = 0) -> Bool {
+        if error.domain.contains("ModelManager") || error.domain.contains("UnifiedAssetFramework") { return true }
+        guard depth < 6 else { return false }
+        var underlying = error.userInfo[NSMultipleUnderlyingErrorsKey] as? [NSError] ?? []
+        if let single = error.userInfo[NSUnderlyingErrorKey] as? NSError { underlying.append(single) }
+        return underlying.contains { wrapsMissingAssets($0, depth: depth + 1) }
     }
 
     /// Model output first; deterministic arithmetic wins for "dans X minutes", and the
