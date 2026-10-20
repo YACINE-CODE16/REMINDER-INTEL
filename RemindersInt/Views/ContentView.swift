@@ -108,10 +108,13 @@ struct ContentView: View {
             #else
             await notifications.requestAuthorization()
             #endif
+            // Nothing is scheduled before the prompt is answered: requests made meanwhile
+            // (evening reminders, prayers…) waited in the budget queue and go out now.
+            await notifications.refreshAuthorizationStatus()
+            NotificationBudget.authorizationResolved()
             await ParserService.shared.checkModel()
             // Safety net after a reinstall or a missed update.
-            notifications.rescheduleAllPending()
-            prayers.resume()
+            rescheduleNotifications()
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             guard phase == .active else { return }
@@ -120,6 +123,10 @@ struct ContentView: View {
             prayers.resume()
             // A workout stopped from the Live Activity (or elsewhere) while away: its summary, once.
             if let summary = GymService.shared.takePendingSummary() { gymSummary = summary }
+            // Permission granted in Réglages since last time: schedule everything again.
+            Task {
+                if await notifications.refreshAuthorizationStatus() { rescheduleNotifications() }
+            }
             // Lock screen control whose intent ran in the widget extension.
             if captureRequests.takePending() { openVoiceCapture() }
         }
@@ -417,6 +424,13 @@ struct ContentView: View {
     private func openVoiceCapture() {
         closeSheets()
         isCapturingVoice = true
+    }
+
+    /// Every service's notifications, from the store.
+    private func rescheduleNotifications() {
+        notifications.rescheduleAllPending()
+        prayers.resume()
+        tracking.rescheduleNotifications()
     }
 
     /// Notification or widget tap: the space running the prayer module, in the Espaces tab.

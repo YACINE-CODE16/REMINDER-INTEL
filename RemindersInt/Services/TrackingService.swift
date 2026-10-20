@@ -172,6 +172,15 @@ final class TrackingService {
 
     /// Launch / foreground: applies a stop requested from the Live Activity while the app was
     /// not running, then brings the Live Activity and reminders back in line with the store.
+    /// After the permission was granted late: the evening reminders and the "Toujours sur … ?"
+    /// of the running session.
+    func rescheduleNotifications(now: Date = .now) {
+        if let active = activeSession() {
+            scheduleLongSessionReminder(for: active, at: max(now.addingTimeInterval(60), active.startedAt.addingTimeInterval(Self.longSessionDelay)))
+        }
+        refreshDailyReminders(now: now)
+    }
+
     func resume() {
         if let requested = SessionControl.takeStopRequest() {
             stop(at: requested)

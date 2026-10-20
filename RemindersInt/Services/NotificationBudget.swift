@@ -63,6 +63,9 @@ enum NotificationBudget {
 
     private static var queue: [UNNotificationRequest] = []
     private static var isApplying = false
+    /// False until the notification permission prompt has been answered (or skipped): requests
+    /// added before would be rejected silently, they wait in the queue instead.
+    private static var isAuthorizationResolved = false
     /// Added by the previous batch: the center may not list them yet.
     private static var lastAdded: [Candidate] = []
 
@@ -73,8 +76,14 @@ enum NotificationBudget {
         applyNext()
     }
 
+    /// Called once the permission prompt is answered: the waiting requests go out.
+    static func authorizationResolved() {
+        isAuthorizationResolved = true
+        applyNext()
+    }
+
     private static func applyNext() {
-        guard !isApplying, !queue.isEmpty else { return }
+        guard isAuthorizationResolved, !isApplying, !queue.isEmpty else { return }
         isApplying = true
         let batch = queue
         queue = []

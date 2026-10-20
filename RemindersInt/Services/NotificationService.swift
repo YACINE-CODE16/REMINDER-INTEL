@@ -23,6 +23,8 @@ final class NotificationService: NSObject {
 
     /// Set when the user taps a notification; the root view opens the matching detail.
     var taskToOpen: UUID?
+    /// Last known notification permission (the day view shows a banner when denied).
+    private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     @ObservationIgnored private var modelContainer: ModelContainer?
     @ObservationIgnored private let center = UNUserNotificationCenter.current()
@@ -58,6 +60,28 @@ final class NotificationService: NSObject {
     /// iOS only shows the prompt once; later calls return the stored answer.
     func requestAuthorization() async {
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    }
+
+    var isAuthorized: Bool {
+        authorizationStatus == .authorized || authorizationStatus == .provisional || authorizationStatus == .ephemeral
+    }
+
+    /// Reads the permission again; true when it just became authorized (granted in Réglages
+    /// while the app was away), so everything must be scheduled again.
+    @discardableResult
+    func refreshAuthorizationStatus() async -> Bool {
+        let wasAuthorized = isAuthorized
+        let wasKnown = authorizationStatus != .notDetermined
+        authorizationStatus = await Self.currentAuthorizationStatus()
+        return wasKnown && !wasAuthorized && isAuthorized
+    }
+
+    nonisolated private static func currentAuthorizationStatus() async -> UNAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                continuation.resume(returning: settings.authorizationStatus)
+            }
+        }
     }
 
     // MARK: - Scheduling
