@@ -313,7 +313,7 @@ final class GymService {
         content.sound = .default
         content.threadIdentifier = "gym"
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, end.timeIntervalSinceNow), repeats: false)
-        center.add(UNNotificationRequest(identifier: Self.restNotificationID, content: content, trigger: trigger))
+        NotificationBudget.add([UNNotificationRequest(identifier: Self.restNotificationID, content: content, trigger: trigger)])
     }
 
     private func clearRest(_ workout: Workout) {

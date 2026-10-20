@@ -247,7 +247,7 @@ final class TrackingService {
         content.sound = .default
         content.categoryIdentifier = Self.longSessionCategory
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
-        center.add(UNNotificationRequest(identifier: Self.longSessionRequestID, content: content, trigger: trigger))
+        NotificationBudget.add([UNNotificationRequest(identifier: Self.longSessionRequestID, content: content, trigger: trigger)])
     }
 
     func handleNotificationResponse(action: String) {
@@ -279,6 +279,7 @@ final class TrackingService {
         guard enabled else { return }
         let calendar = Calendar.app
         let trackedToday = TimeTotals.seconds(sessions(in: TimeTotals.day(containing: now)), in: TimeTotals.day(containing: now), now: now) > 0
+        var daily: [UNNotificationRequest] = []
         for offset in 0..<7 {
             guard let day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: now)),
                   let fire = calendar.date(bySettingHour: Self.dailyReminderHour, minute: 0, second: 0, of: day),
@@ -291,7 +292,8 @@ final class TrackingService {
             content.sound = .default
             let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            center.add(UNNotificationRequest(identifier: "\(Self.dailyRequestPrefix)\(offset)", content: content, trigger: trigger))
+            daily.append(UNNotificationRequest(identifier: "\(Self.dailyRequestPrefix)\(offset)", content: content, trigger: trigger))
         }
+        NotificationBudget.add(daily)
     }
 }

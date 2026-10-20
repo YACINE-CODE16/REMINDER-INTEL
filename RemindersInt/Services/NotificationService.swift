@@ -67,9 +67,7 @@ final class NotificationService: NSObject {
         cancel(reminder)
         defer { refreshWidget() }
         guard reminder.status == .pending else { return }
-        for item in requests(for: reminder, after: .now) {
-            center.add(item.request)
-        }
+        NotificationBudget.add(requests(for: reminder, after: .now).map(\.request))
     }
 
     /// Removes pending and delivered notifications of a task.
@@ -114,9 +112,7 @@ final class NotificationService: NSObject {
             .flatMap { requests(for: $0, after: now) }
             .sorted { $0.date < $1.date }
             .prefix(budget)
-        for item in items {
-            center.add(item.request)
-        }
+        NotificationBudget.add(items.map(\.request))
         refreshWidget()
     }
 

@@ -421,9 +421,7 @@ final class PrayerService {
         let kept = adhans.filter { $0.0 <= horizon }.sorted { $0.0 < $1.0 }.prefix(10)
         let remaining = Self.notificationBudget - kept.count
         let others = (followUps + adhans.filter { $0.0 > horizon }).sorted { $0.0 < $1.0 }.prefix(max(0, remaining))
-        for (_, request) in kept + others {
-            center.add(request)
-        }
+        NotificationBudget.add((kept + others).map(\.1))
     }
 
     /// `identifierIndex`: suffix of the identifier when it differs from the follow-up index (tests).
@@ -455,8 +453,10 @@ final class PrayerService {
         let slots = slots(on: today, settings: settings, records: records(from: today), now: now)
         guard let slot = slots.first(where: { $0.state == .toDo }) ?? slots.first(where: { $0.state == .next }) ?? slots.last else { return }
         // Suffixes 90 / 91: outside the range `scheduleNotifications` clears, same prayer for "Fait".
-        center.add(request(for: slot, fire: now.addingTimeInterval(5), index: 0, lastIndex: 2, settings: settings, identifierIndex: 90))
-        center.add(request(for: slot, fire: now.addingTimeInterval(20), index: 1, lastIndex: 2, settings: settings, identifierIndex: 91))
+        NotificationBudget.add([
+            request(for: slot, fire: now.addingTimeInterval(5), index: 0, lastIndex: 2, settings: settings, identifierIndex: 90),
+            request(for: slot, fire: now.addingTimeInterval(20), index: 1, lastIndex: 2, settings: settings, identifierIndex: 91),
+        ])
         print("PRAYER TEST: \(slot.name) \(slot.time.formatted(.dateTime.hour().minute())) adhan in 5 s, follow-up in 20 s")
     }
 
