@@ -52,14 +52,15 @@ nonisolated struct PrayerCheck: Sendable, Equatable {
 }
 
 extension Calendar {
-    /// Reference calendar for parsing: Europe/Paris, French.
-    nonisolated static let paris: Calendar = {
+    /// Calendar for parsing: the device's current time zone (like the rest of the app),
+    /// French, weeks from Monday. Computed on each use so a time zone change is followed.
+    nonisolated static var parsing: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "fr_FR")
-        calendar.timeZone = TimeZone(identifier: "Europe/Paris") ?? .current
+        calendar.timeZone = .current
         calendar.firstWeekday = 2
         return calendar
-    }()
+    }
 }
 
 /// Text -> ParsedCapture (intent, title, date, repeat, space), on-device only. Uses Foundation Models when Apple Intelligence is
@@ -196,13 +197,13 @@ final class ParserService {
     private static func date(from string: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = Calendar.paris.timeZone
+        formatter.timeZone = Calendar.parsing.timeZone
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
         return formatter.date(from: string.trimmingCharacters(in: .whitespaces))
     }
 
     static func instructions(now: Date, spaces: [SpaceRef] = [], gym: GymContext = .empty) -> String {
-        let calendar = Calendar.paris
+        let calendar = Calendar.parsing
         let dayFormat = Date.FormatStyle(date: .complete, time: .omitted, locale: calendar.locale ?? .app, calendar: calendar, timeZone: calendar.timeZone)
         let isoDay = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day()
         let time = now.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: calendar.locale ?? .app, calendar: calendar, timeZone: calendar.timeZone))
@@ -221,7 +222,7 @@ final class ParserService {
 
         return """
         Tu analyses une phrase dictée en français pour créer un rappel ou une tâche. Réponds uniquement avec les champs demandés.
-        Maintenant : \(now.formatted(dayFormat)), \(time), heure de Paris.
+        Maintenant : \(now.formatted(dayFormat)), \(time), heure locale.
         Jours de référence :
         \(days)
 
@@ -266,7 +267,7 @@ nonisolated struct GeneratedCapture {
     @Guide(description: "L'action à faire, courte, sans « rappelle-moi de » ni « il faut que je », sans date ni relance")
     var title: String
 
-    @Guide(description: "Date et heure absolues au format AAAA-MM-JJTHH:MM (heure de Paris), ou chaîne vide si la phrase n'exprime ni date ni heure")
+    @Guide(description: "Date et heure absolues au format AAAA-MM-JJTHH:MM (heure locale), ou chaîne vide si la phrase n'exprime ni date ni heure")
     var dueDate: String
 
     @Guide(description: "Intervalle de relance demandé dans la phrase, unspecified sinon")

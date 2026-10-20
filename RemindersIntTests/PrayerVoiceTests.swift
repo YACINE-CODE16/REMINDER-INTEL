@@ -45,3 +45,28 @@ struct PrayerVoiceTests {
         #expect(FallbackParser(now: Self.now).parse(phrase).capture.intent != .prayerCheck)
     }
 }
+
+/// Step 8b: parsing follows the device's time zone.
+struct ParsingTimeZoneTests {
+    @Test func parsingCalendarIsTheCurrentTimeZone() {
+        #expect(Calendar.parsing.timeZone == TimeZone.current)
+        #expect(FallbackParser(now: .now).calendar.timeZone == TimeZone.current)
+    }
+
+    /// "Rappelle-moi à 16h" read in Algiers is 16:00 Algiers time (15:00 UTC), not Paris time.
+    @Test func reminderAtFourInAlgiers() throws {
+        var algiers = Calendar(identifier: .gregorian)
+        algiers.locale = Locale(identifier: "fr_FR")
+        algiers.timeZone = try #require(TimeZone(identifier: "Africa/Algiers"))
+        algiers.firstWeekday = 2
+        // 10:00 in Algiers on 18 October 2026 (Paris is UTC+2 that day, Algiers UTC+1).
+        let now = try #require(algiers.date(from: DateComponents(year: 2026, month: 10, day: 18, hour: 10)))
+        let parsed = FallbackParser(now: now, calendar: algiers).parse("Rappelle-moi à 16h").capture
+        let due = try #require(parsed.dueDate)
+        let local = algiers.dateComponents([.year, .month, .day, .hour, .minute], from: due)
+        #expect(local.hour == 16 && local.minute == 0 && local.day == 18)
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try #require(TimeZone(identifier: "UTC"))
+        #expect(utc.component(.hour, from: due) == 15)
+    }
+}

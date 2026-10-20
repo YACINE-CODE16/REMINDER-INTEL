@@ -14,7 +14,7 @@ nonisolated struct FallbackParser {
     let now: Date
     var spaces: [SpaceRef] = []
     var gym: GymContext = .empty
-    var calendar: Calendar = .paris
+    var calendar: Calendar = .parsing
 
     private static let reminderMarkers = #"rappelle[- ]?moi|n['’]oublie pas|fais[- ]moi penser|relance[- ]moi|\brappel\b"#
     private static let taskMarkers = #"il faut que|il faudrait|faut que je|je dois|[àa] rendre|\bdevoirs?\b|\brelancer\b|[àa] faire|\bfinir\b|\bterminer\b|\bpr[ée]parer\b|\br[ée]viser\b"#
