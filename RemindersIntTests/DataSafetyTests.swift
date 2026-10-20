@@ -8,8 +8,7 @@ import Testing
 struct DataSafetyTests {
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
-            for: TaskItem.self, Space.self, Session.self, Goal.self, GoalStep.self, PrayerSettings.self, PrayerRecord.self,
-            Exercise.self, WorkoutTemplate.self, TemplateItem.self, Workout.self, WorkoutEntry.self, WorkoutSet.self, Reminder.self,
+            for: Schema(versionedSchema: SchemaV1.self),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         return ModelContext(container)
@@ -49,6 +48,45 @@ struct DataSafetyTests {
         #expect(bench.allSets.map(\.weightKg) == [85, 90])
         #expect(bench.allSets.map(\.isPR) == [false, true])
         #expect(try context.fetchCount(FetchDescriptor<Workout>()) == 2)
+    }
+
+    // MARK: - Store loading
+
+    private func temporaryStoreURL() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "store-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appending(path: StoreLoader.fileName)
+    }
+
+    /// A healthy store opens in place and keeps its data.
+    @Test func healthyStoreOpens() throws {
+        let url = try temporaryStoreURL()
+        do {
+            let first = StoreLoader.load(at: url)
+            let context = try #require(first.container).mainContext
+            context.insert(Space(name: "Perso", colorHex: "#FF375F", sfSymbol: "house.fill"))
+            try context.save()
+        }
+        let second = StoreLoader.load(at: url)
+        #expect(second.backupURL == nil)
+        #expect(try #require(second.container).mainContext.fetchCount(FetchDescriptor<Space>()) == 1)
+    }
+
+    /// An unreadable file is kept as "default.store.broken-<date>" and an empty store replaces it.
+    @Test func corruptedStoreIsKeptAsideAndReplaced() throws {
+        let url = try temporaryStoreURL()
+        try Data(repeating: 0x42, count: 4096).write(to: url)
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let result = StoreLoader.load(at: url, now: now)
+        let backup = try #require(result.backupURL)
+        #expect(backup.lastPathComponent.hasPrefix("default.store.broken-"))
+        #expect(FileManager.default.fileExists(atPath: backup.path()))
+        #expect(try Data(contentsOf: backup) == Data(repeating: 0x42, count: 4096))
+        let context = try #require(result.container).mainContext
+        #expect(try context.fetchCount(FetchDescriptor<Space>()) == 0)
+        context.insert(Space(name: "Perso", colorHex: "#FF375F", sfSymbol: "house.fill"))
+        try context.save()
+        #expect(FileManager.default.fileExists(atPath: url.path()))
     }
 
     @Test func deletionMessageMentionsTheWorkout() throws {
