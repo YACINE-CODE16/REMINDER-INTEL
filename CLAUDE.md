@@ -143,6 +143,24 @@ V3 livrée, tag `v0.3.0`.
 - Arguments DEBUG : `-seedDemoPrayer YES` (espace « Prière », 20 semaines d'historique, une fois ; `-resetDemoPrayer YES` avant pour refaire), `-prayerNotificationTest YES` (adhan dans 5 s puis relance), `-prayerLogNotifications YES` (liste les demandes de prière planifiées).
 - Arguments DEBUG : `-seedDemoGoals YES` (3 objectifs de chaque type, une fois), `-uiDayOffset <n>`, `-seedDemoSessions YES` (deux semaines de sessions, une fois), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <nom>`, `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (passe par le champ « Simuler une dictée »), `-parserSelfTest YES` (tableau dans la console), `-uiNoPrompt YES` (pas de demande d'autorisation des notifications, pour les captures).
 
+## Signature et configuration
+- L'équipe de signature n'est pas versionnée. Après un clone : `cp Config/Local.xcconfig.example Config/Local.xcconfig`, puis remplacer `YOUR_TEAM_ID` par l'identifiant d'équipe (Xcode › Réglages › Comptes, ou le champ « Team » de l'onglet Signing & Capabilities). `Config/Base.xcconfig`, base des configurations du projet, l'inclut avec `#include?` ; `Config/Local.xcconfig` est dans `.gitignore`.
+- Si Xcode réécrit `DEVELOPMENT_TEAM` dans `project.pbxproj` après un changement dans l'onglet Signing, retirer ces lignes avant de commiter.
+- Région de développement `fr`, iPhone uniquement (`TARGETED_DEVICE_FAMILY = 1`), portrait uniquement. Manifestes de confidentialité `PrivacyInfo.xcprivacy` dans l'app et le widget : pas de suivi, aucune donnée collectée, UserDefaults (CA92.1 pour les réglages de l'app, 1C8F.1 pour l'App Group ; le widget n'utilise que l'App Group). Aucun appel aux API d'horodatage de fichiers, d'heure de démarrage ni d'espace disque (vérifié par grep).
+
+## Audit octobre 2026
+Corrigé :
+- 8a, sécurité des données : suppression de session confirmée (avec la séance de muscu) et PR recalculés ; ModelContainer sans `fatalError`, `SchemaV1` + plan de migration, URL explicite App Group, store illisible mis de côté et recréé avec alerte ; budget de 64 notifications à chaque planification ; données de démo en DEBUG sur argument ; boutons de test des Réglages en DEBUG ; texte de localisation honnête, précision réduite, coordonnées arrondies.
+- 8b, bugs fonctionnels : parsing dans le fuseau de l'appareil ; mode simplifié seulement si le modèle manque, relance des erreurs transitoires ; séance de muscu non coupée à minuit ; série dictée seulement avec un exercice ou un motif explicite ; aucune planification avant la réponse d'autorisation, replanification si accordée plus tard ; toast « Changer » qui attend la feuille ; bandeaux pour notifications, micro et dictée refusés ; dictée uniquement sur l'appareil, session audio toujours libérée, transcriptions en DEBUG seulement.
+- 8c, App Store : icône 1024 unique, manifestes de confidentialité, région `fr`, iPhone portrait uniquement, équipe de signature hors du dépôt.
+
+Reporté :
+- Dynamic Type : tailles de police fixes (`.system(size:)`) dans la plupart des écrans ; à passer sur les styles de texte et vérifier aux grandes tailles.
+- `AppRouter` et `CaptureCoordinator` : `ContentView` porte la navigation, les deep links, les feuilles et tout le traitement des dictées ; à extraire.
+- Prédicats `@Query` : beaucoup de vues chargent tous les objets puis filtrent en mémoire (enums non supportés dans les prédicats SwiftData) ; à remplacer par des prédicats sur des champs simples et des index.
+- Tests manquants : flux UI (seulement dans un harnais temporaire hors dépôt), NotificationService (identifiants, relances), TrackingService (start / stop / log), PrayerService (statuts, stats), GoalMath, StoreSetup (migration V1).
+- Timelines des widgets : « Prochain rappel » et « Prochaine prière » n'ont pas de date de rafraîchissement de secours (`.atEnd` seulement) ; à revoir avec un `after:` raisonnable et un budget de rechargements.
+
 ## Tests à faire sur iPhone physique
 Non vérifiables sur simulateur, à passer avec la V3 (`v0.3.0`) installée sur l'iPhone, dans cet ordre de priorité.
 
