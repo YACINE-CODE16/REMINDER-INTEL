@@ -158,7 +158,7 @@ final class TrackingService {
     }
 
     private func close(_ session: Session, at end: Date) {
-        let pieces = SessionSplit.pieces(from: session.startedAt, to: end)
+        let pieces = SessionSplit.closing(from: session.startedAt, to: end, hasWorkout: session.workout != nil)
         guard let first = pieces.first else {
             session.endedAt = end
             return

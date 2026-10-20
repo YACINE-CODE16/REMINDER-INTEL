@@ -56,6 +56,13 @@ final class Session {
 
 /// Day-bounded pieces of a time range: [22:00, 01:00) → [22:00, 00:00) + [00:00, 01:00).
 enum SessionSplit {
+    /// Pieces a session is closed into. A gym workout keeps its session whole, so its duration
+    /// and volume stay on one session; per-day totals still split it (TimeTotals uses overlaps).
+    static func closing(from start: Date, to end: Date, hasWorkout: Bool, calendar: Calendar = .app) -> [(start: Date, end: Date)] {
+        guard end > start else { return [] }
+        return hasWorkout ? [(start, end)] : pieces(from: start, to: end, calendar: calendar)
+    }
+
     static func pieces(from start: Date, to end: Date, calendar: Calendar = .app) -> [(start: Date, end: Date)] {
         guard end > start else { return [] }
         var result: [(Date, Date)] = []
