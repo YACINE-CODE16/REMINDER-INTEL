@@ -290,6 +290,11 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // The rest bar is on screen: no banner for the end of rest while the app is open.
+        if notification.request.identifier == GymService.restNotificationID {
+            completionHandler([])
+            return
+        }
         let target = Self.target(of: notification)
         // UIKit's handler is not annotated Sendable; it is called exactly once, on the main actor.
         nonisolated(unsafe) let completion = completionHandler

@@ -6,6 +6,7 @@ enum StoreSetup {
     @MainActor
     static func run(in context: ModelContext, defaults: UserDefaults = .standard) {
         migrateLegacyReminders(in: context)
+        ExerciseLibrary.install(in: context)
         if !defaults.bool(forKey: AppStorageKey.hasSeededSpaces) {
             seedSpaces(in: context)
             defaults.set(true, forKey: AppStorageKey.hasSeededSpaces)

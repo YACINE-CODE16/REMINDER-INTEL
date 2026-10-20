@@ -139,12 +139,17 @@ struct VoiceCaptureView: View {
         isParsing = true
         Task {
             let spaces = Space.activeTree(in: modelContext)
-            let parsed = await ParserService.shared.parse(text, spaces: spaces.map(\.ref))
+            let parsed = await ParserService.shared.parse(text, spaces: spaces.map(\.ref), gym: Self.gymContext())
             isParsing = false
             let space = parsed.space.flatMap { ref in spaces.first { $0.id == ref.id } }
             let proposals = space == nil ? Self.proposals(for: parsed, in: spaces) : []
             if parsed.intent.isSession {
                 onCreated(Self.handleSession(parsed, space: space, proposals: proposals, transcript: text))
+                onClose()
+                return
+            }
+            if parsed.intent.isGym, let command = parsed.gym {
+                onCreated(Self.handleGym(parsed.intent, command: command, transcript: text))
                 onClose()
                 return
             }
@@ -206,6 +211,58 @@ struct VoiceCaptureView: View {
                 return CaptureOutcome(kind: .pendingSession(PendingSession(isLog: false, start: now)), transcript: transcript, proposals: proposals)
             }
             return CaptureOutcome(kind: .sessionStarted(session), transcript: transcript, proposals: [])
+        }
+    }
+
+    /// Exercises and programmes for the parser, only when a space runs the gym module.
+    static func gymContext() -> GymContext {
+        let gym = GymService.shared
+        guard gym.gymSpace() != nil else { return .empty }
+        return GymContext(
+            exercises: gym.exercises().map(\.ref),
+            templates: gym.templates().map(\.name),
+            isWorkoutActive: gym.activeWorkout() != nil
+        )
+    }
+
+    /// gym.set / next / finish / start. A set without a running workout starts a free session.
+    static func handleGym(_ intent: CaptureIntent, command: GymCommand, transcript: String) -> CaptureOutcome {
+        let gym = GymService.shared
+        func outcome(_ kind: CaptureOutcome.Kind) -> CaptureOutcome {
+            CaptureOutcome(kind: kind, transcript: transcript, proposals: [])
+        }
+        guard gym.gymSpace() != nil else { return outcome(.gymMessage("Module Salle inactif")) }
+        switch intent {
+        case .gymStart:
+            if let active = gym.activeWorkout() { return outcome(.gymMessage("Séance \(active.name) déjà en cours")) }
+            let template: WorkoutTemplate? = if command.isFreeSession {
+                nil
+            } else if let name = command.templateName {
+                gym.templates().first { $0.name == name }
+            } else {
+                gym.suggestedTemplate()
+            }
+            guard let workout = gym.start(template: template, transcript: transcript) else { return outcome(.gymMessage("Impossible de démarrer la séance")) }
+            gym.requestWorkoutScreen()
+            return outcome(.gymStarted(workout))
+        case .gymNext:
+            guard let workout = gym.activeWorkout() else { return outcome(.gymMessage("Aucune séance en cours")) }
+            guard let entry = gym.next(in: workout) else { return outcome(.gymMessage("Dernier exercice de la séance")) }
+            return outcome(.gymNext(workout, name: entry.exercise?.nameFR ?? "Exercice"))
+        case .gymFinish:
+            guard let workout = gym.activeWorkout() else { return outcome(.gymMessage("Aucune séance en cours")) }
+            return outcome(.gymFinished(workout, gym.finish(workout)))
+        default:
+            let exercise = command.exerciseID.flatMap { id in gym.exercises().first { $0.id == id } }
+            let workout = gym.activeWorkout() ?? gym.start(template: nil, transcript: transcript)
+            guard let workout else { return outcome(.gymMessage("Impossible de démarrer la séance")) }
+            guard let target = exercise ?? workout.currentEntry?.exercise else { return outcome(.gymMessage("Exercice non reconnu")) }
+            guard let value = command.set(for: target.kind) else { return outcome(.gymMessage("Série incomplète · \(target.nameFR)")) }
+            guard let set = gym.addSet(to: exercise, in: workout, reps: value.reps, weight: value.weight, seconds: value.seconds, meters: value.meters) else {
+                return outcome(.gymMessage("Exercice non reconnu"))
+            }
+            let number = set.entry?.sets.count ?? 1
+            return outcome(.gymSet(set, number: number, exercise: target.nameFR, kind: target.kind))
         }
     }
 

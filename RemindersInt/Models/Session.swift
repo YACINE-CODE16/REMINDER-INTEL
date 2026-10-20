@@ -14,6 +14,8 @@ final class Session {
     var note: String?
     /// What was dictated, kept for debugging the parser.
     var rawTranscript: String?
+    /// Set when the session is a gym workout.
+    @Relationship(deleteRule: .cascade, inverse: \Workout.session) var workout: Workout?
 
     init(
         id: UUID = UUID(),

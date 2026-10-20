@@ -176,15 +176,26 @@ final class TrackingService {
 
     // MARK: - Live Activity
 
+    /// Pushes the current state (gym exercise, last set, rest) to the running activity.
+    func refreshActivity() {
+        if let active = activeSession() {
+            startActivity(for: active)
+        }
+    }
+
     /// Starts the activity, or updates the running one for the same session.
     /// Activities are not Sendable: tasks look them up again by id.
     private func startActivity(for session: Session) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled, let space = session.space else { return }
+        let gym = GymService.shared.activityInfo(for: session)
         let state = SessionActivityAttributes.ContentState(
             startedAt: session.startedAt,
             spacePath: space.pathComponents.joined(separator: " · "),
             colorHex: space.colorHex,
-            symbol: space.sfSymbol
+            symbol: space.sfSymbol,
+            exercise: gym.exercise,
+            lastSet: gym.lastSet,
+            restEndsAt: gym.restEndsAt
         )
         let content = ActivityContent(state: state, staleDate: nil)
         let sessionID = session.id

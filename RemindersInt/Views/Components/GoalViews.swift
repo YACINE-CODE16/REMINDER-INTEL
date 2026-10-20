@@ -54,7 +54,7 @@ struct GoalRow: View {
                         .font(.system(size: 14, weight: goal.kind == .outcome ? .regular : .bold))
                         .monospacedDigit()
                         .foregroundStyle(valueColor(achieved: achieved, now: now))
-                    if goal.kind == .count {
+                    if goal.kind == .count, !GoalMath.countsWorkouts(goal) {
                         plusOne
                     }
                 }
@@ -215,6 +215,8 @@ struct GoalCompactLine: View {
         case .outcome:
             if goal.isAchieved { return "Atteint" }
             return goal.deadline.map { $0.formatted(.dateTime.day().month(.abbreviated).locale(.app)) } ?? "—"
+        case .prWeight:
+            return "\(GymMath.kg(GoalMath.prWeight(goal)))/\(GymMath.kg(goal.target)) kg"
         }
     }
 }
@@ -236,6 +238,8 @@ struct GoalFormView: View {
     @State private var counter: Double
     @State private var steps: [String]
     @State private var newStep = ""
+    @State private var exercise: Exercise?
+    @Query(sort: \Exercise.nameFR) private var exercises: [Exercise]
 
     private static let rowBackground = Color.white.opacity(0.7)
 
@@ -251,6 +255,7 @@ struct GoalFormView: View {
         _deadline = State(initialValue: Calendar.app.date(byAdding: .month, value: 1, to: .now) ?? .now)
         _counter = State(initialValue: 0)
         _steps = State(initialValue: [])
+        _exercise = State(initialValue: nil)
     }
 
     init(goal: Goal) {
@@ -265,12 +270,13 @@ struct GoalFormView: View {
         _deadline = State(initialValue: goal.deadline ?? (Calendar.app.date(byAdding: .month, value: 1, to: .now) ?? .now))
         _counter = State(initialValue: GoalMath.count(goal, now: .now))
         _steps = State(initialValue: goal.sortedSteps.map(\.title))
+        _exercise = State(initialValue: goal.exercise)
     }
 
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private var canSave: Bool {
-        !trimmedTitle.isEmpty && space != nil && (kind == .outcome || target > 0)
+        !trimmedTitle.isEmpty && space != nil && (kind == .outcome || target > 0) && (kind != .prWeight || exercise != nil)
     }
 
     /// An outcome or an "until a date" goal has a deadline.
@@ -307,16 +313,30 @@ struct GoalFormView: View {
                                 .frame(width: 80)
                             if kind == .hours {
                                 Text("h").foregroundStyle(Palette.secondary)
+                            } else if kind == .prWeight {
+                                Text("kg").foregroundStyle(Palette.secondary)
                             }
                         }
-                        if kind == .count {
+                        if kind == .prWeight {
+                            Picker("Exercice", selection: $exercise) {
+                                Text("Choisir").tag(Exercise?.none)
+                                ForEach(exercises.filter { $0.kind == .weightReps }) { candidate in
+                                    Text(candidate.nameFR).tag(Optional(candidate))
+                                }
+                            }
+                            .pickerStyle(.navigationLink)
+                            if let exercise {
+                                LabeledContent("Charge max actuelle", value: exercise.maxWeight.map { "\(GymMath.kg($0)) kg" } ?? "—")
+                            }
+                        }
+                        if kind == .count, !isGymCounter {
                             TextField("Unité (séances, clubs…)", text: $unit)
                             if goal != nil {
                                 Stepper("Actuel : \(GoalMath.number(counter))", value: $counter, in: 0...10_000)
                             }
                         }
                         Picker("Période", selection: $period.animation(.appSpring)) {
-                            ForEach(GoalPeriod.allCases) { Text($0.label).tag($0) }
+                            ForEach(kind == .prWeight ? [GoalPeriod.none, .untilDate] : GoalPeriod.allCases) { Text($0.label).tag($0) }
                         }
                     }
                     .listRowBackground(Self.rowBackground)
@@ -378,11 +398,22 @@ struct GoalFormView: View {
         }
     }
 
+    /// A counter in a gym space counts its workouts.
+    private var isGymCounter: Bool {
+        var current = space
+        while let node = current {
+            if node.activeModule == .gym { return true }
+            current = node.parent
+        }
+        return false
+    }
+
     private var kindHint: String {
         switch kind {
         case .hours: "Calculé à partir des sessions de l'espace et de ses sous-espaces."
-        case .count: "Compteur manuel : +1 sur la carte ou « un de plus » à la voix."
+        case .count: isGymCounter ? "Calculé à partir des séances de l'espace sur la période." : "Compteur manuel : +1 sur la carte ou « un de plus » à la voix."
         case .outcome: "Résultat à atteindre, avec des sous-étapes et un état atteint à cocher."
+        case .prWeight: "Charge cible sur un exercice, comparée à ta charge max, mise à jour à chaque record."
         }
     }
 
@@ -409,9 +440,11 @@ struct GoalFormView: View {
             saved = Goal(space: space, title: trimmedTitle, kind: kind, target: target, period: period)
             modelContext.insert(saved)
         }
-        saved.unit = kind == .hours ? "h" : (unit.trimmingCharacters(in: .whitespaces).isEmpty ? nil : unit.trimmingCharacters(in: .whitespaces))
+        saved.unit = kind == .hours ? "h" : kind == .prWeight ? "kg" : (unit.trimmingCharacters(in: .whitespaces).isEmpty ? nil : unit.trimmingCharacters(in: .whitespaces))
+        saved.exerciseID = kind == .prWeight ? exercise?.id : nil
+        if kind == .prWeight, saved.period != .untilDate { saved.period = .none }
         saved.deadline = usesDeadline ? deadline : nil
-        if kind == .count, goal != nil, counter != GoalMath.count(saved, now: .now) {
+        if kind == .count, !isGymCounter, goal != nil, counter != GoalMath.count(saved, now: .now) {
             GoalMath.increment(saved, by: counter - GoalMath.count(saved, now: .now))
         }
         if kind == .outcome {

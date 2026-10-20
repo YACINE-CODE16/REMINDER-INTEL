@@ -132,6 +132,9 @@ struct ContentView: View {
         .onChange(of: prayers.showPrayerSpaceRequests) {
             openPrayerSpace()
         }
+        .onChange(of: GymService.shared.showWorkoutRequests) {
+            open(GymService.shared.gymSpace())
+        }
         .onChange(of: notifications.taskToOpen, initial: true) { _, id in
             guard let id else { return }
             notifications.taskToOpen = nil
@@ -181,12 +184,7 @@ struct ContentView: View {
                             try? modelContext.save()
                             showToast(.goalProgress(goal), from: captureOutcome)
                         },
-                        onUndo: {
-                            guard case .goalProgress(let goal) = captureOutcome.kind else { return }
-                            GoalMath.increment(goal, by: -1)
-                            try? modelContext.save()
-                            showToast(.goalUndone(goal), from: captureOutcome)
-                        }
+                        onUndo: { undo(captureOutcome) }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: captureOutcome.id) {
@@ -238,6 +236,31 @@ struct ContentView: View {
         }
     }
 
+    /// "Annuler" on the toast: +1 removed, set deleted, previous exercise, workout reopened or cancelled.
+    private func undo(_ outcome: CaptureOutcome) {
+        let gym = GymService.shared
+        switch outcome.kind {
+        case .goalProgress(let goal):
+            GoalMath.increment(goal, by: -1)
+            try? modelContext.save()
+            showToast(.goalUndone(goal), from: outcome)
+        case .gymSet(let set, let number, _, _):
+            gym.delete(set)
+            showToast(.gymMessage("S\(number) supprimée"), from: outcome)
+        case .gymNext(let workout, _):
+            gym.previous(in: workout)
+            showToast(.gymMessage("Retour à \(workout.currentEntry?.exercise?.nameFR ?? "l'exercice précédent")"), from: outcome)
+        case .gymFinished(let workout, _):
+            gym.reopen(workout)
+            showToast(.gymMessage("Séance \(workout.name) reprise"), from: outcome)
+        case .gymStarted(let workout):
+            gym.cancel(workout)
+            showToast(.gymMessage("Séance annulée"), from: outcome)
+        default:
+            break
+        }
+    }
+
     /// "Changer" on the toast: moves the task or the sessions to another space.
     private func changeSpace(_ space: Space?) {
         guard let outcome = captureOutcome else { return }
@@ -277,7 +300,7 @@ struct ContentView: View {
 
     #if DEBUG
     /// Screenshot and test helpers:
-    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-seedDemoPrayer YES` ("Prière" space, 20 weeks of prayers, once; `-resetDemoPrayer YES` first to redo it), `-prayerNotificationTest YES` (adhan in 5 s + follow-up), `-prayerLogNotifications YES` (prints pending prayer requests), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
+    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-seedDemoPrayer YES` ("Prière" space, 20 weeks of prayers, once; `-resetDemoPrayer YES` first to redo it), `-prayerNotificationTest YES` (adhan in 5 s + follow-up), `-seedDemoGym YES` ("Salle" space, 20 weeks of workouts, once; `-resetDemoGym YES` first to redo it), `-prayerLogNotifications YES` (prints pending prayer requests), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
     /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
     /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
     private func applyDebugLaunchArguments() async {
@@ -294,6 +317,12 @@ struct ContentView: View {
         if defaults.bool(forKey: "seedDemoPrayer") {
             DemoPrayer.insert(into: modelContext)
             prayers.refresh()
+        }
+        if defaults.bool(forKey: "resetDemoGym") {
+            DemoGym.reset(in: modelContext)
+        }
+        if defaults.bool(forKey: "seedDemoGym") {
+            DemoGym.insert(into: modelContext)
         }
         if defaults.bool(forKey: "prayerNotificationTest") {
             // Once the launch has answered authorization and rebuilt the real requests.
@@ -382,9 +411,14 @@ struct ContentView: View {
 
     /// Notification or widget tap: the space running the prayer module, in the Espaces tab.
     private func openPrayerSpace() {
+        open(prayers.prayerSpace())
+    }
+
+    /// Shows a space (and its ancestors) in the Espaces tab.
+    private func open(_ space: Space?) {
         closeSheets()
         selectedTab = .spaces
-        guard let space = prayers.prayerSpace() else { return }
+        guard let space else { return }
         var chain: [Space] = []
         var current: Space? = space
         while let node = current {

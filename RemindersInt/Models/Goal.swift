@@ -8,6 +8,8 @@ nonisolated enum GoalKind: String, Codable, CaseIterable, Identifiable {
     case count
     /// Result to reach, with sub-steps and an achieved state ticked by the user.
     case outcome
+    /// Target weight on an exercise, fed by its personal records.
+    case prWeight
 
     var id: String { rawValue }
 
@@ -16,6 +18,7 @@ nonisolated enum GoalKind: String, Codable, CaseIterable, Identifiable {
         case .hours: "Heures"
         case .count: "Compteur"
         case .outcome: "Résultat"
+        case .prWeight: "Charge"
         }
     }
 }
@@ -69,6 +72,16 @@ final class Goal {
     var createdAt: Date
     var isArchived: Bool
     @Relationship(deleteRule: .cascade, inverse: \GoalStep.goal) var steps: [GoalStep] = []
+    /// Exercise of a prWeight goal, by id. Not a relationship: a Goal → Exercise relationship
+    /// made SwiftData clear the exercise of that exercise's workout entries.
+    var exerciseID: String?
+
+    var exercise: Exercise? {
+        guard let exerciseID, let context = modelContext else { return nil }
+        var descriptor = FetchDescriptor<Exercise>(predicate: #Predicate { $0.id == exerciseID })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
 
     init(
         id: UUID = UUID(),
@@ -142,9 +155,33 @@ enum GoalMath {
         return TimeTotals.seconds(sessions, in: window, within: space, now: now) / 3600
     }
 
+    /// A counter in a gym space counts the workouts of its period by itself.
+    static func countsWorkouts(_ goal: Goal) -> Bool {
+        guard goal.kind == .count, var space = goal.space else { return false }
+        while true {
+            if space.activeModule == .gym { return true }
+            guard let parent = space.parent else { return false }
+            space = parent
+        }
+    }
+
+    /// Workouts of the goal's space subtree started in its window.
+    static func workouts(_ goal: Goal, now: Date) -> Double {
+        guard let space = goal.space else { return 0 }
+        let window = window(for: goal, now: now)
+        let sessions = space.subtree.flatMap(\.sessions).filter { $0.workout != nil && window.contains($0.startedAt) }
+        return Double(sessions.count)
+    }
+
+    /// Heaviest weight ever lifted on the goal's exercise.
+    static func prWeight(_ goal: Goal) -> Double {
+        goal.exercise?.maxWeight ?? 0
+    }
+
     /// Counter value for the current period: a weekly or monthly counter left from a
-    /// previous period reads 0.
+    /// previous period reads 0. Gym counters count workouts.
     static func count(_ goal: Goal, now: Date) -> Double {
+        if countsWorkouts(goal) { return workouts(goal, now: now) }
         switch goal.period {
         case .week, .month:
             guard let start = goal.counterPeriodStart, window(for: goal, now: now).contains(start) else { return 0 }
@@ -160,13 +197,14 @@ enum GoalMath {
         case .hours: hours(goal, sessions: sessions, now: now)
         case .count: count(goal, now: now)
         case .outcome: Double(goal.steps.filter(\.isDone).count)
+        case .prWeight: prWeight(goal)
         }
     }
 
     /// 0…1 progress; outcome goals use their steps (achieved = 1).
     static func fraction(_ goal: Goal, sessions: [Session], now: Date) -> Double {
         switch goal.kind {
-        case .hours, .count:
+        case .hours, .count, .prWeight:
             guard goal.target > 0 else { return 0 }
             return min(1, value(goal, sessions: sessions, now: now) / goal.target)
         case .outcome:
@@ -178,7 +216,7 @@ enum GoalMath {
 
     static func isAchieved(_ goal: Goal, sessions: [Session], now: Date) -> Bool {
         switch goal.kind {
-        case .hours, .count: goal.target > 0 && value(goal, sessions: sessions, now: now) >= goal.target
+        case .hours, .count, .prWeight: goal.target > 0 && value(goal, sessions: sessions, now: now) >= goal.target
         case .outcome: goal.isAchieved
         }
     }
@@ -222,6 +260,8 @@ enum GoalMath {
         case .outcome:
             if goal.isAchieved { return "Atteint" }
             return goal.deadline.map(deadlineLabel) ?? "Sans échéance"
+        case .prWeight:
+            return "\(GymMath.kg(prWeight(goal))) / \(GymMath.kg(goal.target)) kg"
         }
     }
 

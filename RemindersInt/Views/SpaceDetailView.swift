@@ -51,6 +51,10 @@ struct SpaceDetailView: View {
                 PrayerModuleView(settings: settings, color: space.color)
                     .glassListRow(top: 8, bottom: 4)
             }
+            if space.activeModule == .gym {
+                GymModuleView(space: space)
+                    .glassListRow(top: 8, bottom: 4)
+            }
 
             sectionHeader("Objectifs") {
                 Button("Ajouter") { isAddingGoal = true }
@@ -171,16 +175,30 @@ struct SpaceDetailView: View {
 
     private var moduleMenu: some View {
         Menu {
-            if space.activeModule == .prayer {
+            switch space.activeModule {
+            case .prayer:
                 Button("Réglages Prière", systemImage: "slider.horizontal.3") { isShowingPrayerSettings = true }
                 Button("Désactiver le module", systemImage: "xmark.circle", role: .destructive) {
                     PrayerService.shared.deactivate(space)
                 }
-            } else if let other = PrayerService.shared.prayerSpace(), other.id != space.id {
-                Text("Module Prière actif dans \(other.name)")
-            } else {
-                Button("Activer le module Prière", systemImage: "moon.stars") {
-                    Task { await Self.activatePrayer(on: space, refused: $prayerLocationRefused, showSettings: $isShowingPrayerSettings) }
+            case .gym:
+                Button("Désactiver le module", systemImage: "xmark.circle", role: .destructive) {
+                    GymService.shared.deactivate(space)
+                }
+            case .none:
+                if let other = PrayerService.shared.prayerSpace(), other.id != space.id {
+                    Text("Module Prière actif dans \(other.name)")
+                } else {
+                    Button("Activer le module Prière", systemImage: "moon.stars") {
+                        Task { await Self.activatePrayer(on: space, refused: $prayerLocationRefused, showSettings: $isShowingPrayerSettings) }
+                    }
+                }
+                if let other = GymService.shared.gymSpace(), other.id != space.id {
+                    Text("Module Salle actif dans \(other.name)")
+                } else {
+                    Button("Activer le module Salle", systemImage: "dumbbell") {
+                        GymService.shared.activate(on: space)
+                    }
                 }
             }
         } label: {
@@ -216,16 +234,43 @@ struct SpaceDetailView: View {
         return text
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 14) {
+        let _ = GymService.shared.revision
+        if space.activeModule == .gym, let workout = GymService.shared.activeWorkout() {
+            workoutHeader(workout)
+        } else {
+            HStack(spacing: 14) {
+                SpaceBadge(space: space, size: 48)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(space.name)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(Palette.text)
+                    Text(subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.secondary)
+                }
+            }
+        }
+    }
+
+    /// "Push A" / "Séance en cours · 00:42:10 · 3 / 5 exercices".
+    private func workoutHeader(_ workout: Workout) -> some View {
+        let entries = workout.sortedEntries
+        let position = (entries.firstIndex { $0.order == workout.currentOrder } ?? 0) + 1
+        return HStack(spacing: 14) {
             SpaceBadge(space: space, size: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text(space.name)
+                Text(workout.name)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Palette.text)
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Palette.secondary)
+                let timer = Text(timerInterval: workout.startedAt...Date.distantFuture, countsDown: false, showsHours: true)
+                let progress = entries.isEmpty ? "" : " · \(position) / \(entries.count) exercices"
+                Text("Séance en cours · \(timer)\(progress)")
+                .font(.system(size: 13))
+                .monospacedDigit()
+                .foregroundStyle(Palette.secondary)
+                .lineLimit(1)
             }
         }
     }

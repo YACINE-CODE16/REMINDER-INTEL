@@ -13,6 +13,7 @@ nonisolated struct FallbackParser {
 
     let now: Date
     var spaces: [SpaceRef] = []
+    var gym: GymContext = .empty
     var calendar: Calendar = .paris
 
     private static let reminderMarkers = #"rappelle[- ]?moi|n['’]oublie pas|fais[- ]moi penser|relance[- ]moi|\brappel\b"#
@@ -29,6 +30,10 @@ nonisolated struct FallbackParser {
     func parse(_ text: String) -> Output {
         if let check = Self.prayerCheck(in: text) {
             let capture = ParsedCapture(intent: .prayerCheck, title: check.prayer.name, dueDate: nil, repeatInterval: nil, prayerCheck: check, confidence: 0.8, spaceGuesses: [], engine: .fallback)
+            return Output(capture: capture, isRelativeOffset: false)
+        }
+        if let (intent, command) = GymParsing.command(in: text, context: gym) {
+            let capture = ParsedCapture(intent: intent, title: text, dueDate: nil, repeatInterval: nil, gym: command, confidence: 0.8, spaceGuesses: [], engine: .fallback)
             return Output(capture: capture, isRelativeOffset: false)
         }
         var rest = text

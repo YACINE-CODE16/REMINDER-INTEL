@@ -10,6 +10,10 @@ nonisolated struct SessionActivityAttributes: ActivityAttributes {
         var spacePath: String
         var colorHex: String
         var symbol: String
+        /// Gym workout: current exercise, last set ("80 × 8"), end of the rest timer.
+        var exercise: String? = nil
+        var lastSet: String? = nil
+        var restEndsAt: Date? = nil
     }
 
     var sessionID: UUID

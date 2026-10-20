@@ -25,6 +25,11 @@ struct SessionLiveActivity: Widget {
                             .lineLimit(1)
                         SessionTimer(startedAt: state.startedAt)
                             .font(.system(size: 28, weight: .bold))
+                        if let exercise = state.exercise {
+                            GymLine(exercise: exercise, lastSet: state.lastSet, restEndsAt: state.restEndsAt)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -67,12 +72,37 @@ private struct SessionLockScreenView: View {
                     .lineLimit(1)
                 SessionTimer(startedAt: state.startedAt)
                     .font(.system(size: 30, weight: .bold))
+                if let exercise = state.exercise {
+                    GymLine(exercise: exercise, lastSet: state.lastSet, restEndsAt: state.restEndsAt)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.8))
+                }
             }
             Spacer(minLength: 8)
             StopButton(size: 52)
         }
         .padding(16)
         .widgetURL(URL(string: "remindersint://tracking"))
+    }
+}
+
+/// "Développé couché · 80 × 8 · repos 0:54" during a gym workout.
+private struct GymLine: View {
+    let exercise: String
+    let lastSet: String?
+    let restEndsAt: Date?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text([exercise, lastSet].compactMap { $0 }.joined(separator: " · "))
+                .lineLimit(1)
+            if let restEndsAt, restEndsAt > .now {
+                Text("· repos")
+                Text(timerInterval: Date.now...restEndsAt, countsDown: true)
+                    .monospacedDigit()
+                    .frame(maxWidth: 44, alignment: .leading)
+            }
+        }
     }
 }
 

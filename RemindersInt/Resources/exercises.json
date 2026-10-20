@@ -1,0 +1,799 @@
+[
+ {
+  "id": "bench_press",
+  "fr": "Développé couché",
+  "en": "Bench press",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "bench",
+   "dc",
+   "développé couché",
+   "bench press",
+   "couché"
+  ]
+ },
+ {
+  "id": "incline_bench_press",
+  "fr": "Développé incliné",
+  "en": "Incline bench press",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "incliné",
+   "dci",
+   "développé incliné",
+   "incline bench",
+   "incline bench press",
+   "incline"
+  ]
+ },
+ {
+  "id": "dumbbell_bench_press",
+  "fr": "Développé couché haltères",
+  "en": "Dumbbell bench press",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "dc haltères",
+   "développé couché haltères",
+   "db bench",
+   "dumbbell bench",
+   "dumbbell press"
+  ]
+ },
+ {
+  "id": "incline_dumbbell_press",
+  "fr": "Développé incliné haltères",
+  "en": "Incline dumbbell press",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "incliné haltères",
+   "développé incliné haltères",
+   "incline db",
+   "incline dumbbell",
+   "incline dumbbell press"
+  ]
+ },
+ {
+  "id": "chest_fly",
+  "fr": "Écarté couché",
+  "en": "Dumbbell fly",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "écarté",
+   "écartés",
+   "écarté couché",
+   "fly",
+   "flyes",
+   "dumbbell fly"
+  ]
+ },
+ {
+  "id": "cable_crossover",
+  "fr": "Écarté poulie",
+  "en": "Cable crossover",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "écarté poulie",
+   "poulie vis-à-vis",
+   "vis-à-vis",
+   "crossover",
+   "cable fly",
+   "cable crossover"
+  ]
+ },
+ {
+  "id": "push_up",
+  "fr": "Pompes",
+  "en": "Push-up",
+  "muscle": "chest",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "pompes",
+   "pompe",
+   "push up",
+   "push ups",
+   "pushups"
+  ]
+ },
+ {
+  "id": "dips",
+  "fr": "Dips",
+  "en": "Dips",
+  "muscle": "chest",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "dips",
+   "dips pecs",
+   "dip"
+  ]
+ },
+ {
+  "id": "chest_press_machine",
+  "fr": "Presse pectoraux",
+  "en": "Chest press machine",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "presse pecs",
+   "presse pectoraux",
+   "chest press",
+   "machine pecs"
+  ]
+ },
+ {
+  "id": "pec_deck",
+  "fr": "Pec deck",
+  "en": "Pec deck",
+  "muscle": "chest",
+  "kind": "weightReps",
+  "aliases": [
+   "pec deck",
+   "butterfly",
+   "peck deck"
+  ]
+ },
+ {
+  "id": "deadlift",
+  "fr": "Soulevé de terre",
+  "en": "Deadlift",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "sdt",
+   "soulevé de terre",
+   "deadlift",
+   "dl",
+   "soulevé"
+  ]
+ },
+ {
+  "id": "romanian_deadlift",
+  "fr": "Soulevé de terre roumain",
+  "en": "Romanian deadlift",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "rdl",
+   "roumain",
+   "sdt roumain",
+   "soulevé de terre roumain",
+   "romanian deadlift",
+   "romanian"
+  ]
+ },
+ {
+  "id": "pull_up",
+  "fr": "Tractions",
+  "en": "Pull-up",
+  "muscle": "back",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "tractions",
+   "traction",
+   "pull up",
+   "pull ups",
+   "pullups",
+   "pullup"
+  ]
+ },
+ {
+  "id": "chin_up",
+  "fr": "Tractions supination",
+  "en": "Chin-up",
+  "muscle": "back",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "tractions supination",
+   "traction supination",
+   "chin up",
+   "chin ups",
+   "chinups"
+  ]
+ },
+ {
+  "id": "lat_pulldown",
+  "fr": "Tirage vertical",
+  "en": "Lat pulldown",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "tirage vertical",
+   "tirage poitrine",
+   "lat pulldown",
+   "pulldown",
+   "lat pull down"
+  ]
+ },
+ {
+  "id": "seated_cable_row",
+  "fr": "Tirage horizontal",
+  "en": "Seated cable row",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "tirage horizontal",
+   "rowing poulie",
+   "cable row",
+   "seated row",
+   "seated cable row"
+  ]
+ },
+ {
+  "id": "barbell_row",
+  "fr": "Rowing barre",
+  "en": "Barbell row",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "rowing",
+   "rowing barre",
+   "barbell row",
+   "bent over row",
+   "row"
+  ]
+ },
+ {
+  "id": "dumbbell_row",
+  "fr": "Rowing haltère",
+  "en": "Dumbbell row",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "rowing haltère",
+   "rowing haltères",
+   "one arm row",
+   "db row",
+   "dumbbell row"
+  ]
+ },
+ {
+  "id": "face_pull",
+  "fr": "Face pull",
+  "en": "Face pull",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "face pull",
+   "face pulls",
+   "facepull"
+  ]
+ },
+ {
+  "id": "shrug",
+  "fr": "Shrugs",
+  "en": "Shrug",
+  "muscle": "back",
+  "kind": "weightReps",
+  "aliases": [
+   "shrugs",
+   "shrug",
+   "haussements d'épaules",
+   "haussement d'épaules"
+  ]
+ },
+ {
+  "id": "back_extension",
+  "fr": "Extensions lombaires",
+  "en": "Back extension",
+  "muscle": "back",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "lombaires",
+   "extensions lombaires",
+   "hyperextensions",
+   "hyperextension",
+   "back extension"
+  ]
+ },
+ {
+  "id": "overhead_press",
+  "fr": "Développé militaire",
+  "en": "Overhead press",
+  "muscle": "shoulders",
+  "kind": "weightReps",
+  "aliases": [
+   "ohp",
+   "développé militaire",
+   "militaire",
+   "overhead press",
+   "military press"
+  ]
+ },
+ {
+  "id": "dumbbell_shoulder_press",
+  "fr": "Développé épaules haltères",
+  "en": "Dumbbell shoulder press",
+  "muscle": "shoulders",
+  "kind": "weightReps",
+  "aliases": [
+   "développé épaules",
+   "développé haltères épaules",
+   "shoulder press",
+   "db shoulder press",
+   "dumbbell shoulder press"
+  ]
+ },
+ {
+  "id": "arnold_press",
+  "fr": "Développé Arnold",
+  "en": "Arnold press",
+  "muscle": "shoulders",
+  "kind": "weightReps",
+  "aliases": [
+   "arnold",
+   "développé arnold",
+   "arnold press"
+  ]
+ },
+ {
+  "id": "lateral_raise",
+  "fr": "Élévations latérales",
+  "en": "Lateral raise",
+  "muscle": "shoulders",
+  "kind": "weightReps",
+  "aliases": [
+   "élévations latérales",
+   "élévation latérale",
+   "latérales",
+   "lateral raise",
+   "lateral raises",
+   "side raises"
+  ]
+ },
+ {
+  "id": "rear_delt_fly",
+  "fr": "Oiseau",
+  "en": "Rear delt fly",
+  "muscle": "shoulders",
+  "kind": "weightReps",
+  "aliases": [
+   "oiseau",
+   "oiseaux",
+   "rear delt",
+   "rear delt fly",
+   "reverse fly"
+  ]
+ },
+ {
+  "id": "barbell_curl",
+  "fr": "Curl barre",
+  "en": "Barbell curl",
+  "muscle": "biceps",
+  "kind": "weightReps",
+  "aliases": [
+   "curl",
+   "curl barre",
+   "barbell curl",
+   "ez curl",
+   "curl ez"
+  ]
+ },
+ {
+  "id": "dumbbell_curl",
+  "fr": "Curl haltères",
+  "en": "Dumbbell curl",
+  "muscle": "biceps",
+  "kind": "weightReps",
+  "aliases": [
+   "curl haltères",
+   "curl haltère",
+   "db curl",
+   "dumbbell curl"
+  ]
+ },
+ {
+  "id": "hammer_curl",
+  "fr": "Curl marteau",
+  "en": "Hammer curl",
+  "muscle": "biceps",
+  "kind": "weightReps",
+  "aliases": [
+   "marteau",
+   "curl marteau",
+   "hammer curl",
+   "hammer"
+  ]
+ },
+ {
+  "id": "preacher_curl",
+  "fr": "Curl pupitre",
+  "en": "Preacher curl",
+  "muscle": "biceps",
+  "kind": "weightReps",
+  "aliases": [
+   "pupitre",
+   "curl pupitre",
+   "larry scott",
+   "preacher",
+   "preacher curl"
+  ]
+ },
+ {
+  "id": "cable_curl",
+  "fr": "Curl poulie",
+  "en": "Cable curl",
+  "muscle": "biceps",
+  "kind": "weightReps",
+  "aliases": [
+   "curl poulie",
+   "cable curl"
+  ]
+ },
+ {
+  "id": "triceps_pushdown",
+  "fr": "Extension triceps poulie",
+  "en": "Triceps pushdown",
+  "muscle": "triceps",
+  "kind": "weightReps",
+  "aliases": [
+   "pushdown",
+   "push down",
+   "extension poulie",
+   "triceps poulie",
+   "poulie triceps",
+   "triceps pushdown"
+  ]
+ },
+ {
+  "id": "skull_crusher",
+  "fr": "Barre au front",
+  "en": "Skull crusher",
+  "muscle": "triceps",
+  "kind": "weightReps",
+  "aliases": [
+   "barre au front",
+   "skull crusher",
+   "skull crushers",
+   "skullcrusher"
+  ]
+ },
+ {
+  "id": "overhead_triceps_extension",
+  "fr": "Extension triceps nuque",
+  "en": "Overhead triceps extension",
+  "muscle": "triceps",
+  "kind": "weightReps",
+  "aliases": [
+   "extension nuque",
+   "extension triceps nuque",
+   "overhead extension",
+   "french press"
+  ]
+ },
+ {
+  "id": "close_grip_bench",
+  "fr": "Développé couché prise serrée",
+  "en": "Close-grip bench press",
+  "muscle": "triceps",
+  "kind": "weightReps",
+  "aliases": [
+   "prise serrée",
+   "développé serré",
+   "close grip",
+   "close grip bench"
+  ]
+ },
+ {
+  "id": "bench_dips",
+  "fr": "Dips sur banc",
+  "en": "Bench dips",
+  "muscle": "triceps",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "dips banc",
+   "dips sur banc",
+   "bench dips"
+  ]
+ },
+ {
+  "id": "squat",
+  "fr": "Squat",
+  "en": "Back squat",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "squat",
+   "squats",
+   "back squat"
+  ]
+ },
+ {
+  "id": "front_squat",
+  "fr": "Squat avant",
+  "en": "Front squat",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "squat avant",
+   "front squat"
+  ]
+ },
+ {
+  "id": "leg_press",
+  "fr": "Presse à cuisses",
+  "en": "Leg press",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "presse",
+   "presse à cuisses",
+   "presse cuisses",
+   "leg press"
+  ]
+ },
+ {
+  "id": "lunge",
+  "fr": "Fentes",
+  "en": "Lunge",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "fentes",
+   "fente",
+   "lunges",
+   "lunge"
+  ]
+ },
+ {
+  "id": "bulgarian_split_squat",
+  "fr": "Squat bulgare",
+  "en": "Bulgarian split squat",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "bulgare",
+   "squat bulgare",
+   "bulgarian",
+   "split squat",
+   "bulgarian split squat"
+  ]
+ },
+ {
+  "id": "leg_extension",
+  "fr": "Leg extension",
+  "en": "Leg extension",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "leg extension",
+   "leg extensions",
+   "extension quadriceps",
+   "leg ext"
+  ]
+ },
+ {
+  "id": "leg_curl",
+  "fr": "Leg curl",
+  "en": "Leg curl",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "leg curl",
+   "leg curls",
+   "ischios machine",
+   "curl ischios"
+  ]
+ },
+ {
+  "id": "calf_raise",
+  "fr": "Mollets debout",
+  "en": "Standing calf raise",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "mollets",
+   "mollet",
+   "calf raise",
+   "calf raises",
+   "calves"
+  ]
+ },
+ {
+  "id": "hack_squat",
+  "fr": "Hack squat",
+  "en": "Hack squat",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "hack squat",
+   "hack"
+  ]
+ },
+ {
+  "id": "goblet_squat",
+  "fr": "Goblet squat",
+  "en": "Goblet squat",
+  "muscle": "legs",
+  "kind": "weightReps",
+  "aliases": [
+   "goblet",
+   "goblet squat"
+  ]
+ },
+ {
+  "id": "hip_thrust",
+  "fr": "Hip thrust",
+  "en": "Hip thrust",
+  "muscle": "glutes",
+  "kind": "weightReps",
+  "aliases": [
+   "hip thrust",
+   "hip thrusts",
+   "hipthrust",
+   "poussée de hanche"
+  ]
+ },
+ {
+  "id": "glute_bridge",
+  "fr": "Pont fessier",
+  "en": "Glute bridge",
+  "muscle": "glutes",
+  "kind": "weightReps",
+  "aliases": [
+   "pont fessier",
+   "glute bridge"
+  ]
+ },
+ {
+  "id": "cable_kickback",
+  "fr": "Kickback poulie",
+  "en": "Cable kickback",
+  "muscle": "glutes",
+  "kind": "weightReps",
+  "aliases": [
+   "kickback",
+   "kick back",
+   "kickback poulie",
+   "cable kickback"
+  ]
+ },
+ {
+  "id": "plank",
+  "fr": "Gainage",
+  "en": "Plank",
+  "muscle": "core",
+  "kind": "time",
+  "aliases": [
+   "gainage",
+   "planche",
+   "plank"
+  ]
+ },
+ {
+  "id": "crunch",
+  "fr": "Crunch",
+  "en": "Crunch",
+  "muscle": "core",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "crunch",
+   "crunchs",
+   "crunches",
+   "abdos"
+  ]
+ },
+ {
+  "id": "hanging_leg_raise",
+  "fr": "Relevé de jambes suspendu",
+  "en": "Hanging leg raise",
+  "muscle": "core",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "relevé de jambes",
+   "relevés de jambes",
+   "leg raise",
+   "leg raises",
+   "hanging leg raise"
+  ]
+ },
+ {
+  "id": "russian_twist",
+  "fr": "Rotations russes",
+  "en": "Russian twist",
+  "muscle": "core",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "russian twist",
+   "rotations russes",
+   "rotation russe"
+  ]
+ },
+ {
+  "id": "ab_wheel",
+  "fr": "Roue abdominale",
+  "en": "Ab wheel rollout",
+  "muscle": "core",
+  "kind": "bodyweightReps",
+  "aliases": [
+   "roue abdominale",
+   "roue",
+   "ab wheel",
+   "rollout"
+  ]
+ },
+ {
+  "id": "running",
+  "fr": "Course",
+  "en": "Running",
+  "muscle": "cardio",
+  "kind": "distance",
+  "aliases": [
+   "course",
+   "courir",
+   "running",
+   "tapis",
+   "run"
+  ]
+ },
+ {
+  "id": "rowing_machine",
+  "fr": "Rameur",
+  "en": "Rowing machine",
+  "muscle": "cardio",
+  "kind": "distance",
+  "aliases": [
+   "rameur",
+   "rower",
+   "erg",
+   "rowing machine"
+  ]
+ },
+ {
+  "id": "cycling",
+  "fr": "Vélo",
+  "en": "Cycling",
+  "muscle": "cardio",
+  "kind": "time",
+  "aliases": [
+   "vélo",
+   "velo",
+   "bike",
+   "cycling",
+   "spinning"
+  ]
+ },
+ {
+  "id": "jump_rope",
+  "fr": "Corde à sauter",
+  "en": "Jump rope",
+  "muscle": "cardio",
+  "kind": "time",
+  "aliases": [
+   "corde à sauter",
+   "corde",
+   "jump rope"
+  ]
+ },
+ {
+  "id": "farmer_walk",
+  "fr": "Marche du fermier",
+  "en": "Farmer's walk",
+  "muscle": "other",
+  "kind": "distance",
+  "aliases": [
+   "farmer",
+   "farmer walk",
+   "farmers walk",
+   "marche du fermier"
+  ]
+ },
+ {
+  "id": "kettlebell_swing",
+  "fr": "Swing kettlebell",
+  "en": "Kettlebell swing",
+  "muscle": "other",
+  "kind": "weightReps",
+  "aliases": [
+   "swing",
+   "swings",
+   "kettlebell",
+   "kb swing",
+   "kettlebell swing"
+  ]
+ }
+]

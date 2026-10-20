@@ -16,6 +16,16 @@ nonisolated enum CaptureIntent: String, Sendable, Equatable {
     case goalProgress
     /// "J'ai fait dhuhr", "asr en retard", "j'ai rattrapé isha d'hier": ticks a prayer (prayer.check).
     case prayerCheck
+    /// "Bench 85 kilos 5 reps", "squat 100 pour 3": a set of the workout (gym.set).
+    case gymSet
+    /// "Exercice suivant" (gym.next).
+    case gymNext
+    /// "Fin de séance" (gym.finish).
+    case gymFinish
+    /// "Je commence push A" (gym.start).
+    case gymStart
+
+    var isGym: Bool { self == .gymSet || self == .gymNext || self == .gymFinish || self == .gymStart }
 
     var isSession: Bool { self == .sessionStart || self == .sessionStop || self == .sessionLog }
 }

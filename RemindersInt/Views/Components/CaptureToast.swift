@@ -27,6 +27,16 @@ struct CaptureOutcome: Identifiable {
         case prayerChecked(name: String, status: PrayerStatus, isYesterday: Bool)
         /// No space runs the prayer module.
         case prayerUnavailable
+        /// Gym: a set added ("S3 · 85 kg × 5 · nouveau record"), undone by deleting it.
+        case gymSet(WorkoutSet, number: Int, exercise: String, kind: ExerciseKind)
+        /// Gym: moved to the next exercise, undone by going back.
+        case gymNext(Workout, name: String)
+        /// Gym: workout ended, undone by reopening it.
+        case gymFinished(Workout, WorkoutSummary)
+        /// Gym: workout started, undone by cancelling it.
+        case gymStarted(Workout)
+        /// Gym: nothing done, with the reason (or an undo done).
+        case gymMessage(String)
     }
 
     let id = UUID()
@@ -63,8 +73,10 @@ struct CaptureOutcome: Identifiable {
     }
 
     var canUndo: Bool {
-        if case .goalProgress = kind { return true }
-        return false
+        switch kind {
+        case .goalProgress, .gymSet, .gymNext, .gymFinished, .gymStarted: true
+        default: false
+        }
     }
 
     var currentSpace: Space? {
@@ -125,6 +137,18 @@ struct CaptureToastView: View {
             }
         case .prayerUnavailable:
             return "Module Prière inactif"
+        case .gymSet(let set, let number, _, let kind):
+            let record = set.isPR ? " · nouveau record" : ""
+            return "S\(number) · \(GymMath.longLabel(set.value, kind: kind))\(record)"
+        case .gymNext(_, let name):
+            return "Exercice suivant · \(name)"
+        case .gymFinished(_, let summary):
+            let records = summary.records.isEmpty ? "" : " · \(summary.records.count) PR"
+            return "Séance terminée · \(TimeFormat.short(summary.duration)) · \(GymMath.volumeLabel(summary.volume))\(records)"
+        case .gymStarted(let workout):
+            return "Séance \(workout.name) démarrée"
+        case .gymMessage(let message):
+            return message
         }
     }
 
@@ -136,7 +160,9 @@ struct CaptureToastView: View {
         case .pendingSession(let pending):
             pending.end.map { "\(pending.start.formatted(Self.timeStyle)) – \($0.formatted(Self.timeStyle))" }
         case .goalProgress(let goal), .goalUndone(let goal): GoalMath.valueLabel(goal, sessions: [], now: .now)
-        case .sessionStopped, .goalChoice, .goalNotFound, .prayerChecked, .prayerUnavailable: nil
+        case .gymSet(_, _, let exercise, _): exercise
+        case .sessionStopped, .goalChoice, .goalNotFound, .prayerChecked, .prayerUnavailable,
+             .gymNext, .gymFinished, .gymStarted, .gymMessage: nil
         }
         guard let prefix else { return outcome.transcript }
         return "\(prefix) · \(outcome.transcript)"
@@ -146,7 +172,11 @@ struct CaptureToastView: View {
         if outcome.asksForSpace { return ("questionmark.circle.fill", .white) }
         switch outcome.kind {
         case .goalChoice: return ("questionmark.circle.fill", .white)
-        case .goalNotFound, .goalUndone, .prayerUnavailable: return ("info.circle.fill", .white)
+        case .goalNotFound, .goalUndone, .prayerUnavailable, .gymMessage: return ("info.circle.fill", .white)
+        case .gymSet(let set, _, _, _): return (set.isPR ? "trophy.circle.fill" : "checkmark.circle.fill", Palette.green)
+        case .gymStarted: return ("play.circle.fill", Palette.green)
+        case .gymFinished: return ("flag.checkered.circle.fill", Palette.green)
+        case .gymNext: return ("arrow.right.circle.fill", Palette.green)
         case .prayerChecked(_, let status, _):
             return ("checkmark.circle.fill", status == .late ? PrayerModuleView.orange : status == .madeUp ? .white : Palette.green)
         case .goalProgress: return ("plus.circle.fill", Palette.green)

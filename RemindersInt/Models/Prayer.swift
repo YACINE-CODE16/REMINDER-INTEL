@@ -6,7 +6,6 @@ import SwiftUI
 nonisolated enum SpaceModule: String, Codable, CaseIterable, Identifiable, Sendable {
     case none
     case prayer
-    /// Step 7b.
     case gym
 
     var id: String { rawValue }
@@ -23,19 +22,20 @@ nonisolated enum SpaceModule: String, Codable, CaseIterable, Identifiable, Senda
     var colorHex: String? {
         switch self {
         case .prayer: "#0F9D8A"
-        case .none, .gym: nil
+        case .gym: "#34C759"
+        case .none: nil
         }
     }
 
     var symbol: String? {
         switch self {
         case .prayer: "moon.stars.fill"
-        case .none, .gym: nil
+        case .gym: "dumbbell.fill"
+        case .none: nil
         }
     }
 
-    /// Modules that exist in this build (gym comes with step 7b).
-    static let available: [SpaceModule] = [.none, .prayer]
+    static let available: [SpaceModule] = [.none, .prayer, .gym]
 }
 
 extension Space {

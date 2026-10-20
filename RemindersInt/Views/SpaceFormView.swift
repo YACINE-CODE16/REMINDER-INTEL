@@ -46,6 +46,8 @@ struct SpaceFormView: View {
                 } footer: {
                     if module == .prayer, let other = PrayerService.shared.prayerSpace() {
                         Text("Le module Prière est déjà actif dans \(other.name) : il y sera désactivé.")
+                    } else if module == .gym, let other = GymService.shared.gymSpace() {
+                        Text("Le module Salle est déjà actif dans \(other.name) : il y sera désactivé.")
                     } else {
                         Text("Un module ajoute un écran dédié en haut de l'espace, sans retirer tâches, temps ni objectifs.")
                     }
@@ -138,6 +140,9 @@ struct SpaceFormView: View {
             // One prayer module at a time.
             if let other = PrayerService.shared.prayerSpace() { PrayerService.shared.deactivate(other) }
             Task { await SpaceDetailView.activatePrayer(on: space) }
+        } else if module == .gym {
+            if let other = GymService.shared.gymSpace(), other.id != space.id { GymService.shared.deactivate(other) }
+            GymService.shared.activate(on: space)
         }
         dismiss()
     }

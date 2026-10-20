@@ -19,6 +19,8 @@ nonisolated struct ParsedCapture: Sendable, Equatable {
     var duration: TimeInterval? = nil
     /// Which prayer and how (prayerCheck).
     var prayerCheck: PrayerCheck? = nil
+    /// Exercise, numbers or programme (gym intents).
+    var gym: GymCommand? = nil
     var confidence: Double
     /// Most likely spaces, best first; empty when nothing fits.
     var spaceGuesses: [SpaceGuess]
@@ -85,17 +87,17 @@ final class ParserService {
         }
     }
 
-    func parse(_ text: String, spaces: [SpaceRef] = [], now: Date = .now) async -> ParsedCapture {
-        let fallback = FallbackParser(now: now, spaces: spaces).parse(text)
+    func parse(_ text: String, spaces: [SpaceRef] = [], gym: GymContext = .empty, now: Date = .now) async -> ParsedCapture {
+        let fallback = FallbackParser(now: now, spaces: spaces, gym: gym).parse(text)
         guard isModelAvailable else { return fallback.capture }
         do {
-            let session = LanguageModelSession(instructions: Self.instructions(now: now, spaces: spaces))
+            let session = LanguageModelSession(instructions: Self.instructions(now: now, spaces: spaces, gym: gym))
             let response = try await session.respond(
                 to: text,
                 generating: GeneratedCapture.self,
                 options: GenerationOptions(sampling: .greedy)
             )
-            return Self.merge(response.content, fallback: fallback, spaces: spaces)
+            return Self.merge(response.content, fallback: fallback, spaces: spaces, gym: gym)
         } catch {
             // Degrade to the rule-based parser for this sentence.
             recordFailure(error)
@@ -120,8 +122,23 @@ final class ParserService {
     /// rule-based date fills in when the model returns none.
     /// Space paths the model returns are matched back to real spaces; unknown ones are dropped,
     /// and the keyword guesses are used when the model returns none.
-    private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef]) -> ParsedCapture {
+    private static func merge(_ generated: GeneratedCapture, fallback: FallbackParser.Output, spaces: [SpaceRef], gym: GymContext = .empty) -> ParsedCapture {
         let base = fallback.capture
+        // Gym: the rules read exercise names and numbers exactly; the model fills what they miss.
+        if base.intent.isGym || (gym.isModuleOn && generated.intent.intent.isGym) {
+            var command = base.gym ?? GymCommand()
+            if command.exerciseID == nil, !generated.gymExercise.isEmpty {
+                command.exerciseID = GymParsing.matchExercise(in: generated.gymExercise, exercises: gym.exercises)?.id
+            }
+            if command.weight == nil, command.pair == nil, command.bare.isEmpty, generated.gymWeightKg > 0 { command.weight = generated.gymWeightKg }
+            if command.reps == nil, command.pair == nil, command.bare.count < 2, generated.gymReps > 0 { command.reps = generated.gymReps }
+            if command.templateName == nil, !generated.gymTemplate.isEmpty {
+                let key = SpaceRouter.normalize(generated.gymTemplate)
+                command.templateName = gym.templates.first { SpaceRouter.normalize($0) == key }
+            }
+            let intent = base.intent.isGym ? base.intent : generated.intent.intent
+            return ParsedCapture(intent: intent, title: base.title, dueDate: nil, repeatInterval: nil, gym: command, confidence: generated.confidence, spaceGuesses: [], engine: .foundationModels)
+        }
         // Prayer names are unambiguous: the rule-based reading wins, the model fills a gap.
         if generated.intent == .prayerCheck || base.intent == .prayerCheck {
             let rules = base.prayerCheck
@@ -156,6 +173,17 @@ final class ParserService {
         )
     }
 
+    static func gymInstructions(_ gym: GymContext) -> String {
+        """
+
+          gymSet quand on annonce une série de musculation (« bench 85 kilos 5 reps », « développé couché 85 5 », « squat 100 pour 3 »).
+          gymNext pour « exercice suivant ». gymFinish pour « fin de séance ». gymStart pour commencer une séance (« je commence push A »).
+        - gymExercise : pour gymSet, le nom de l'exercice tel qu'il est dit (français ou anglais), chaîne vide sinon.
+        - gymWeightKg : pour gymSet, la charge en kilos (0 si absente). gymReps : le nombre de répétitions (0 si absent).
+        - gymTemplate : pour gymStart, le programme parmi : \(gym.templates.joined(separator: ", ")) ; chaîne vide sinon.
+        """
+    }
+
     /// Exact path first ("Études > Finance"), then a unique last component ("Finance").
     private static func space(matching path: String, in spaces: [SpaceRef]) -> SpaceRef? {
         let key = SpaceRouter.normalize(path)
@@ -173,7 +201,7 @@ final class ParserService {
         return formatter.date(from: string.trimmingCharacters(in: .whitespaces))
     }
 
-    static func instructions(now: Date, spaces: [SpaceRef] = []) -> String {
+    static func instructions(now: Date, spaces: [SpaceRef] = [], gym: GymContext = .empty) -> String {
         let calendar = Calendar.paris
         let dayFormat = Date.FormatStyle(date: .complete, time: .omitted, locale: calendar.locale ?? .app, calendar: calendar, timeZone: calendar.timeZone)
         let isoDay = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day()
@@ -215,7 +243,7 @@ final class ParserService {
           prayerCheck quand on coche une prière (« j'ai fait dhuhr », « fajr fait », « asr en retard », « j'ai rattrapé isha d'hier »). Noms acceptés : fajr ou sobh, dhuhr ou dohr, asr, maghrib, isha ou icha.
         - prayer : pour prayerCheck, la prière (fajr, dhuhr, asr, maghrib, isha) ; none sinon.
         - prayerMark : done si la prière est simplement faite, onTime si « à l'heure » est dit, late si « en retard », madeUp si « rattrapé ».
-        - prayerYesterday : true si la prière est celle d'hier (« d'hier », « hier »).
+        - prayerYesterday : true si la prière est celle d'hier (« d'hier », « hier »).\(gym.isModuleOn ? Self.gymInstructions(gym) : "")
         - durationMinutes : pour sessionLog, la durée en minutes (« 2h » = 120, « 1h30 » = 90) ; 0 sinon.
           Pour sessionLog, dueDate est le début de la session si un moment est donné (« ce matin » = 09:00, « hier soir » = 19:00 la veille), sinon chaîne vide. Pour sessionStart et sessionStop, dueDate est une chaîne vide.
         - spaces : jusqu'à 3 espaces les plus probables parmi la liste ci-dessous, du plus probable au moins probable.
@@ -261,6 +289,18 @@ nonisolated struct GeneratedCapture {
 
     @Guide(description: "Pour prayerCheck, true si c'est la prière d'hier")
     var prayerYesterday: Bool
+
+    @Guide(description: "Pour gymSet, nom de l'exercice dit (français ou anglais) ; chaîne vide sinon")
+    var gymExercise: String
+
+    @Guide(description: "Pour gymSet, charge en kilos ; 0 si absente", .range(0.0...1000.0))
+    var gymWeightKg: Double
+
+    @Guide(description: "Pour gymSet, nombre de répétitions ; 0 si absent", .range(0...500))
+    var gymReps: Int
+
+    @Guide(description: "Pour gymStart, nom du programme ; chaîne vide sinon")
+    var gymTemplate: String
 }
 
 @Generable
@@ -319,6 +359,10 @@ nonisolated enum GeneratedIntent {
     case sessionLog
     case goalProgress
     case prayerCheck
+    case gymSet
+    case gymNext
+    case gymFinish
+    case gymStart
 
     var intent: CaptureIntent {
         switch self {
@@ -329,6 +373,10 @@ nonisolated enum GeneratedIntent {
         case .sessionLog: .sessionLog
         case .goalProgress: .goalProgress
         case .prayerCheck: .prayerCheck
+        case .gymSet: .gymSet
+        case .gymNext: .gymNext
+        case .gymFinish: .gymFinish
+        case .gymStart: .gymStart
         }
     }
 }
