@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import SwiftData
 
 /// Voice capture panel: live transcript, waveform, green validate button.
@@ -93,6 +94,13 @@ struct VoiceCaptureView: View {
             if isParsing {
                 ProgressView()
                 Text("Analyse…")
+            } else if let error = speech.errorMessage, speech.isPermissionDenied {
+                PermissionBanner(
+                    message: error,
+                    systemImage: "mic.slash.fill",
+                    settingsURL: UIApplication.openSettingsURLString,
+                    onDark: true
+                )
             } else if let error = speech.errorMessage {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(Palette.red)

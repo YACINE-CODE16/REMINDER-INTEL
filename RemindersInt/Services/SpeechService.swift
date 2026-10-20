@@ -11,6 +11,8 @@ final class SpeechService {
     private(set) var level: Double = 0
     private(set) var isListening = false
     private(set) var errorMessage: String?
+    /// Microphone or speech recognition refused: the panel links to the app's settings.
+    private(set) var isPermissionDenied = false
 
     @ObservationIgnored private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "fr-FR"))
     @ObservationIgnored private let audioEngine = AVAudioEngine()
@@ -24,8 +26,10 @@ final class SpeechService {
     func start() async {
         guard !isListening else { return }
         errorMessage = nil
+        isPermissionDenied = false
         guard await Self.requestPermissions() else {
-            errorMessage = "Autorise le micro et la reconnaissance vocale dans Réglages."
+            isPermissionDenied = true
+            errorMessage = "Micro ou dictée refusés : la dictée ne peut pas t'entendre."
             return
         }
         guard let recognizer, recognizer.isAvailable else {

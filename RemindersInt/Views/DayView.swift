@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import SwiftData
 
 struct DayView: View {
@@ -25,6 +26,13 @@ struct DayView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            if NotificationService.shared.authorizationStatus == .denied {
+                PermissionBanner(
+                    message: "Les rappels ne sonneront pas, activer les notifications",
+                    settingsURL: UIApplication.openNotificationSettingsURLString
+                )
+                .padding(.horizontal, 20)
+            }
             header
             daySelector
             reminderList
