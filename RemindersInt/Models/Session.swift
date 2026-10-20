@@ -12,7 +12,7 @@ final class Session {
     var startedAt: Date
     var endedAt: Date?
     var note: String?
-    /// What was dictated, kept for debugging the parser.
+    /// What was dictated, kept for debugging the parser in DEBUG builds only.
     var rawTranscript: String?
     /// Set when the session is a gym workout.
     @Relationship(deleteRule: .cascade, inverse: \Workout.session) var workout: Workout?
@@ -30,7 +30,7 @@ final class Session {
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.note = note
-        self.rawTranscript = rawTranscript
+        self.rawTranscript = DictationPrivacy.kept(rawTranscript)
     }
 
     var isActive: Bool { endedAt == nil }

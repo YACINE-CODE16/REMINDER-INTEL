@@ -18,6 +18,8 @@ final class SpeechService {
     @ObservationIgnored private let audioEngine = AVAudioEngine()
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
+    @ObservationIgnored private var isAudioSessionActive = false
+    @ObservationIgnored private var isTapInstalled = false
 
     private enum SpeechError: Error {
         case noAudioInput
@@ -36,6 +38,11 @@ final class SpeechService {
             errorMessage = "Reconnaissance vocale indisponible."
             return
         }
+        // Audio never goes to Apple's servers: without the offline French model, no dictation.
+        guard recognizer.supportsOnDeviceRecognition else {
+            errorMessage = "Dictée hors ligne en français absente : ajoute le clavier français et active la dictée (Réglages › Général › Clavier). Rien n'est envoyé en ligne."
+            return
+        }
         do {
             try startRecognition(with: recognizer)
         } catch {
@@ -44,23 +51,30 @@ final class SpeechService {
         }
     }
 
+    /// Ends listening and always releases the audio session, whatever was started.
     func stop() {
-        guard request != nil else { return }
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if audioEngine.isRunning { audioEngine.stop() }
+        if isTapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            isTapInstalled = false
+        }
         request?.endAudio()
         task?.finish()
         request = nil
         task = nil
         isListening = false
         level = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if isAudioSessionActive {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            isAudioSessionActive = false
+        }
     }
 
     private func startRecognition(with recognizer: SFSpeechRecognizer) throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
+        isAudioSessionActive = true
 
         let input = audioEngine.inputNode
         let format = input.outputFormat(forBus: 0)
@@ -69,13 +83,14 @@ final class SpeechService {
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        // On-device when the recognizer supports it, Apple's server otherwise.
-        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        // On-device only (checked in start()).
+        request.requiresOnDeviceRecognition = true
         self.request = request
 
         input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.makeTapBlock(request: request) { [weak self] level in
             Task { @MainActor in self?.level = level }
         })
+        isTapInstalled = true
         audioEngine.prepare()
         try audioEngine.start()
 

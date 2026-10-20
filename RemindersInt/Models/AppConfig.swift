@@ -20,9 +20,21 @@ extension Calendar {
     }
 }
 
+/// What was dictated is kept only in DEBUG builds, to debug the parser.
+nonisolated enum DictationPrivacy {
+    static func kept(_ transcript: String?) -> String? {
+        #if DEBUG
+        transcript
+        #else
+        nil
+        #endif
+    }
+}
+
 enum AppStorageKey {
     static let defaultRepeatInterval = "defaultRepeatInterval"
     static let hasSeededDemoData = "hasSeededDemoData"
     static let hasSeededSpaces = "hasSeededSpaces"
+    static let hasPurgedTranscripts = "hasPurgedTranscripts"
     static let dailyTrackingReminder = "dailyTrackingReminder"
 }

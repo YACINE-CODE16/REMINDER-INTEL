@@ -14,7 +14,7 @@ final class TaskItem {
     var status: ReminderStatus
     var createdAt: Date
     var remindersSent: Int
-    /// What was dictated, kept for debugging the parser.
+    /// What was dictated, kept for debugging the parser in DEBUG builds only.
     var rawTranscript: String?
     var note: String?
     var isReminder: Bool
@@ -40,7 +40,7 @@ final class TaskItem {
         self.status = status
         self.createdAt = createdAt
         self.remindersSent = remindersSent
-        self.rawTranscript = rawTranscript
+        self.rawTranscript = DictationPrivacy.kept(rawTranscript)
         self.note = note
         self.isReminder = isReminder
         self.space = space

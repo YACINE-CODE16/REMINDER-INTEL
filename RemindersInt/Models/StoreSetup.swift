@@ -7,6 +7,13 @@ enum StoreSetup {
     static func run(in context: ModelContext, defaults: UserDefaults = .standard) {
         migrateLegacyReminders(in: context)
         ExerciseLibrary.install(in: context)
+        #if !DEBUG
+        // Dictations stored by earlier versions are dropped once.
+        if !defaults.bool(forKey: AppStorageKey.hasPurgedTranscripts) {
+            purgeTranscripts(in: context)
+            defaults.set(true, forKey: AppStorageKey.hasPurgedTranscripts)
+        }
+        #endif
         if !defaults.bool(forKey: AppStorageKey.hasSeededSpaces) {
             seedSpaces(in: context)
             defaults.set(true, forKey: AppStorageKey.hasSeededSpaces)
@@ -35,6 +42,15 @@ enum StoreSetup {
                 ))
             }
             context.delete(reminder)
+        }
+    }
+
+    static func purgeTranscripts(in context: ModelContext) {
+        for task in (try? context.fetch(FetchDescriptor<TaskItem>())) ?? [] where task.rawTranscript != nil {
+            task.rawTranscript = nil
+        }
+        for session in (try? context.fetch(FetchDescriptor<Session>())) ?? [] where session.rawTranscript != nil {
+            session.rawTranscript = nil
         }
     }
 
