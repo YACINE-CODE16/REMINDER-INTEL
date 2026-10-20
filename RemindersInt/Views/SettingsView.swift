@@ -5,10 +5,12 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
     @AppStorage(AppStorageKey.dailyTrackingReminder) private var dailyTrackingReminder = true
+    #if DEBUG
     @State private var isTestScheduled = false
     @State private var cleanupMessage: String?
 
     private static let testReminderTitle = "Test de notification"
+    #endif
 
     var body: some View {
         ScrollView {
@@ -64,51 +66,65 @@ struct SettingsView: View {
                     .foregroundStyle(Palette.secondary)
                     .padding(.horizontal, 4)
 
-                GlassCard {
-                    Button(action: scheduleTestNotification) {
-                        HStack {
-                            Text("Tester une notification dans 10 s")
-                                .foregroundStyle(Palette.text)
-                            Spacer()
-                            Image(systemName: "bell.badge")
-                                .foregroundStyle(Palette.green)
-                        }
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 12)
-
-                if isTestScheduled {
-                    Text("Rappel de test créé, relance toutes les 5 min. Marque-le Fait pour arrêter.")
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondary)
-                        .padding(.horizontal, 4)
-                }
-
-                GlassCard {
-                    Button(action: completeTestReminders) {
-                        HStack {
-                            Text("Marquer tous les rappels de test comme faits")
-                                .foregroundStyle(Palette.text)
-                            Spacer()
-                            Image(systemName: "checkmark.circle")
-                                .foregroundStyle(Palette.green)
-                        }
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if let cleanupMessage {
-                    Text(cleanupMessage)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondary)
-                        .padding(.horizontal, 4)
-                }
+                #if DEBUG
+                developmentSection
+                #endif
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
+        }
+    }
+
+    #if DEBUG
+    /// Notification test helpers, DEBUG builds only.
+    @ViewBuilder
+    private var developmentSection: some View {
+        Text("Développement")
+            .font(.title3.bold())
+            .foregroundStyle(Palette.text)
+            .padding(.top, 24)
+
+        GlassCard {
+            Button(action: scheduleTestNotification) {
+                HStack {
+                    Text("Tester une notification dans 10 s")
+                        .foregroundStyle(Palette.text)
+                    Spacer()
+                    Image(systemName: "bell.badge")
+                        .foregroundStyle(Palette.green)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 12)
+
+        if isTestScheduled {
+            Text("Rappel de test créé, relance toutes les 5 min. Marque-le Fait pour arrêter.")
+                .font(.footnote)
+                .foregroundStyle(Palette.secondary)
+                .padding(.horizontal, 4)
+        }
+
+        GlassCard {
+            Button(action: completeTestReminders) {
+                HStack {
+                    Text("Marquer tous les rappels de test comme faits")
+                        .foregroundStyle(Palette.text)
+                    Spacer()
+                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(Palette.green)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+
+        if let cleanupMessage {
+            Text(cleanupMessage)
+                .font(.footnote)
+                .foregroundStyle(Palette.secondary)
+                .padding(.horizontal, 4)
         }
     }
 
@@ -137,6 +153,7 @@ struct SettingsView: View {
         NotificationService.shared.schedule(reminder)
         isTestScheduled = true
     }
+    #endif
 }
 
 #Preview {
