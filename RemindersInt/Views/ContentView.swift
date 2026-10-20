@@ -197,9 +197,13 @@ struct ContentView: View {
                         onUndo: { undo(captureOutcome) }
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .task(id: captureOutcome.id) {
+                    // Restarted when the space picker opens or closes: no auto-close while the
+                    // picker is up, a full delay again once it is closed.
+                    .task(id: "\(captureOutcome.id)-\(isChangingSpace)") {
+                        guard !isChangingSpace else { return }
                         // Longer when a question is asked.
                         try? await Task.sleep(for: .seconds(captureOutcome.asksQuestion ? 10 : 6))
+                        guard !Task.isCancelled else { return }
                         withAnimation(.appSpring) { self.captureOutcome = nil }
                     }
                 }
