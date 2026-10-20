@@ -1,0 +1,4 @@
+// Settings shared by every target.
+// The signing team is not versioned: copy Local.xcconfig.example to Local.xcconfig
+// (ignored by git) and put your team id in it.
+#include? "Local.xcconfig"
