@@ -74,10 +74,15 @@ enum PrayerLocator {
         return places
     }
 
+    /// Two decimals (about 1 km): enough for prayer times, no more precise than needed.
+    nonisolated static func rounded(_ coordinate: Double) -> Double {
+        (coordinate * 100).rounded() / 100
+    }
+
     /// Saves the place in the settings and rebuilds times, notifications and widget.
     static func apply(_ place: Place, to settings: PrayerSettings) {
-        settings.latitude = place.latitude
-        settings.longitude = place.longitude
+        settings.latitude = rounded(place.latitude)
+        settings.longitude = rounded(place.longitude)
         settings.cityName = place.name
         settings.hasLocation = true
         try? settings.modelContext?.save()

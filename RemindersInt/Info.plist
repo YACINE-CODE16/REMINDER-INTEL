@@ -4,6 +4,8 @@
 <dict>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSLocationDefaultAccuracyReduced</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

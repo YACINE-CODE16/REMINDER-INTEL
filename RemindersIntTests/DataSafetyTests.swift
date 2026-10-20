@@ -112,3 +112,24 @@ struct DataSafetyTests {
         #expect(message.contains("1 série"))
     }
 }
+
+/// Step 8a: location privacy.
+struct LocationPrivacyTests {
+    @Test func coordinatesAreRoundedToTwoDecimals() {
+        #expect(PrayerLocator.rounded(48.85661) == 48.86)
+        #expect(PrayerLocator.rounded(2.35222) == 2.35)
+        #expect(PrayerLocator.rounded(-0.004) == 0)
+    }
+
+    /// Paris at full precision and rounded: prayer times within a minute.
+    @Test func roundingKeepsPrayerTimes() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris") ?? .gmt
+        let day = calendar.date(from: DateComponents(year: 2026, month: 10, day: 18, hour: 12))!
+        let exact = PrayerTimesCalculator(latitude: 48.85661, longitude: 2.35222).times(on: day, calendar: calendar)
+        let rounded = PrayerTimesCalculator(latitude: 48.86, longitude: 2.35).times(on: day, calendar: calendar)
+        for prayer in Prayer.allCases {
+            #expect(abs(exact.time(of: prayer).timeIntervalSince(rounded.time(of: prayer))) <= 60)
+        }
+    }
+}

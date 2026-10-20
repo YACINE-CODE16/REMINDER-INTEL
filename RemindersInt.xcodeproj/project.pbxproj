@@ -559,7 +559,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RemindersInt/Info.plist;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "La position sert à calculer les horaires de prière. Elle reste sur l'iPhone.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Votre position sert à calculer les horaires de prière. Le nom de la ville est obtenu via Plans d'Apple.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Le micro sert à dicter vos rappels.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "La reconnaissance vocale transforme votre dictée en rappel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -596,7 +596,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RemindersInt/Info.plist;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "La position sert à calculer les horaires de prière. Elle reste sur l'iPhone.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Votre position sert à calculer les horaires de prière. Le nom de la ville est obtenu via Plans d'Apple.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Le micro sert à dicter vos rappels.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "La reconnaissance vocale transforme votre dictée en rappel.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
