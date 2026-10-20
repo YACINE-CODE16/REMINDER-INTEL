@@ -96,6 +96,7 @@ V2 livrée, tag `v0.2.0`.
 ## V3 : Modules
 - [x] Étape 7a : module Prière (calculateur, statuts, écran maquette 11, `ContributionGrid`, notifications adhan + relances, widget « Prochaine prière », contrôle « Prière faite », intention `prayerCheck`).
 - [x] Étape 7b : module Salle (bibliothèque de 60 exercices FR / EN, programmes, séance = Session, séries et PR, repos + notification, Live Activity, maquette 12, courbes Swift Charts, intentions gym.set / next / finish / start, Goal `prWeight` et compteur de séances).
+V3 livrée, tag `v0.3.0`.
 
 ## Décisions prises en cours de route
 - Étape 2 : compteur remindersSent = notifications délivrées, première incluse (libellé « Notifications envoyées »). Rattrapage app fermée par calcul des heures passées. Suppression : swipe complet à gauche (avec confirmation) et bouton dans le détail.
@@ -132,6 +133,7 @@ V2 livrée, tag `v0.2.0`.
 - Étape 7b : l'écran de séance n'est pas une feuille : pendant une séance, le détail de l'espace Salle devient l'écran de la maquette 12 (barre d'onglets, micro et toast restent visibles). Une séance = une Session du suivi : le Stop de la Live Activity la termine aussi. La Live Activity de session porte en plus l'exercice, la dernière série et la fin du repos.
 - Étape 7b : PR. Une série est un record si elle bat tout ce qui précède sur l'exercice : charge plus lourde, 1RM estimé plus haut, ou plus de reps à une charge déjà faite (plus de reps / de durée / de distance pour les autres types). Les toutes premières séries d'un exercice ne sont pas des records. Recalculés dans l'ordre chronologique à chaque ajout, modification ou suppression. Le résumé de fin ajoute le record de volume d'une séance par exercice.
 - Étape 7b : repos = `restSeconds` de l'exercice (90 s en séance libre), démarré à chaque série ; notification « Repos terminé », sans bannière quand l'app est ouverte. « + » copie la dernière série du jour, sinon la dernière jamais faite, sinon la cible du programme.
+- Étape 7b : une séance terminée hors de l'app (Stop de la Live Activity, « Arrêter maintenant », « j'arrête ») garde `summaryShownAt` vide ; son résumé s'ouvre en feuille au prochain retour au premier plan, une seule fois (séances terminées dans les 12 dernières heures). « Terminer » et « fin de séance » le marquent comme vu ; « Annuler » sur une fin de séance le remet à vide.
 - Étape 7b : voix. Règles d'abord (alias FR / EN, l'alias le plus long gagne : « leg curl » avant « curl ») ; Foundation Models complète l'exercice, la charge, les reps ou le programme. « 85 5 » = charge puis reps ; « 100 pour 3 » ; « 85 kilos 5 reps » ; « 82,5 kg ». Une série sans séance en cours démarre une séance libre. « Je commence la séance » sans programme = programme suggéré. Annuler : supprime la série, revient à l'exercice précédent, rouvre la séance ou annule le démarrage.
 - Étape 7b : stats du module. Fréquence = séances des 8 dernières semaines / 8. Série = jours depuis le début de la suite d'entraînements en cours, 2 jours de repos d'affilée au plus. Grille : volume du jour / volume du jour le plus chargé, 0,2 minimum pour un jour d'entraînement.
 - Étape 7b : objectifs. Un compteur dans un espace Salle (ou un descendant) compte tout seul les séances de sa période. `prWeight` = charge max de l'exercice (record) face à la cible, période « sans » ou « jusqu'à une date ». Goal garde l'`exerciseID` et non une relation : une relation Goal → Exercise faisait vider par SwiftData le lien exercice des entrées de séance de cet exercice (vérifié sur simulateur).
@@ -140,44 +142,29 @@ V2 livrée, tag `v0.2.0`.
 - Arguments DEBUG : `-seedDemoGoals YES` (3 objectifs de chaque type, une fois), `-uiDayOffset <n>`, `-seedDemoSessions YES` (deux semaines de sessions, une fois), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <nom>`, `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (passe par le champ « Simuler une dictée »), `-parserSelfTest YES` (tableau dans la console), `-uiNoPrompt YES` (pas de demande d'autorisation des notifications, pour les captures).
 
 ## Tests à faire sur iPhone physique
-Non vérifiables sur simulateur, à passer avec la V2 (`v0.2.0`) installée sur l'iPhone.
+Non vérifiables sur simulateur, à passer avec la V3 (`v0.3.0`) installée sur l'iPhone, dans cet ordre de priorité.
 
-Socle V1 :
-- Micro et transcription en direct (le simulateur reste sur « Micro inactif »), barre d'onde, reconnaissance on-device fr-FR.
-- Foundation Models : Apple Intelligence est désactivé sur le Mac de dev, donc toutes les extractions testées viennent du parser de secours. Vérifier titres, dates (« jeudi prochain à 16h », « ce soir »…) et intervalles extraits par le modèle, et que la note de Réglages n'apparaît pas.
-- Notifications : appui long sur la notification pour afficher Annuler / Fait sur l'écran verrouillé, relances réelles toutes les 5 / 15 / 30 / 60 min, son.
-- Contrôle « Dicter un rappel » : le placer en bas de l'écran verrouillé (à la place de la lampe ou de l'appareil photo), vérifier tap → Face ID → app déjà en écoute.
-- Widget « Prochain rappel » sur l'écran verrouillé : rendu avec préfixe « Rappel · » / « Tâche · », mise à jour après création / Fait / suppression, ouverture du détail au tap.
-- Signature avec l'Apple ID gratuit : la capacité App Groups doit être acceptée par le profil de l'équipe personnelle (sinon, le widget « Prochain rappel » ne reçoit plus de données ; le contrôle reste fonctionnel quand l'intent s'exécute dans l'app).
-- Appui long sur le micro vert (formulaire manuel) et retour haptique.
+### 1. Socle V1 : micro, Foundation Models, contrôle écran verrouillé
+- Signature avec l'Apple ID gratuit : la capacité App Groups doit être acceptée par le profil de l'équipe personnelle (sinon le widget « Prochain rappel » ne reçoit plus de données ; le contrôle reste fonctionnel quand l'intent s'exécute dans l'app). Première ouverture avec le store du téléphone : les rappels existants réapparaissent avec leurs notifications.
+- Micro et transcription en direct (le simulateur reste sur « Micro inactif »), barre d'onde, reconnaissance on-device fr-FR ; vraie dictée en salle (bruit).
+- Foundation Models (Apple Intelligence est désactivé sur le Mac de dev : tout ce qui a été testé vient du parser de secours) : titres, dates (« jeudi prochain à 16h », « ce soir »…) et intervalles ; routage intention + espace sur les phrases de `ParserSelfTest` et des phrases réelles ; `sessionStart` / `sessionStop` / `sessionLog`, `goalProgress`, `prayerCheck`, `gymSet` / `gymNext` / `gymFinish` / `gymStart` (noms anglais compris) ; la note « mode simplifié » de Réglages ne doit pas apparaître.
+- Contrôle « Dicter un rappel » placé en bas de l'écran verrouillé (à la place de la lampe ou de l'appareil photo) : tap → Face ID → app déjà en écoute.
 
-Étape 6a (espaces) :
-- Première ouverture avec le store V1 du téléphone : les rappels existants doivent réapparaître (sans espace) avec leurs notifications.
-- Routage Foundation Models (intention, chemin, confiance) sur les 10 phrases de `ParserSelfTest` et des phrases réelles.
-- Réordonnancement du hub par appui long, archivage par balayage, « Changer » et les puces du toast, cercle Fait dans le détail d'espace.
-
-Étape 6b (suivi du temps) :
-- Live Activity sur l'écran verrouillé (non capturable automatiquement au simulateur : Cmd-L dans Simulator), Dynamic Island compacte et étendue, bouton Stop de l'activité app fermée.
-- Notification « Toujours sur … ? » avec Continuer / Arrêter maintenant, rappel « Rien tracké aujourd'hui » de 20 h.
-- Routage Foundation Models des phrases de session (`sessionStart`, `sessionStop`, `sessionLog`).
-
-Étape 6c (objectifs) :
-- +1 et Annuler du toast au doigt, cercle atteint et sous-étapes, balayage « Archiver » des objectifs.
-- Formulaire d'objectif (segmented, unité, période, échéance, étapes), compteur ajustable.
+### 2. Notifications et Live Activities
+- Rappels : appui long sur la notification pour Annuler / Fait sur l'écran verrouillé, relances réelles toutes les 5 / 15 / 30 / 60 min, son.
+- Sessions : Live Activity sur l'écran verrouillé (Cmd-L dans Simulator ne suffit pas), Dynamic Island compacte et étendue, Stop app fermée ; « Toujours sur … ? » avec Continuer / Arrêter maintenant ; « Rien tracké aujourd'hui » à 20 h.
+- Prière : adhan réel et relances jusqu'à la prochaine prière, action « Fait » sur l'écran verrouillé, mode discret ; passage à minuit (prières manquées) et Isha cochée après minuit.
+- Salle : Live Activity d'une séance (exercice, dernière série, chrono de repos), Stop depuis l'écran verrouillé puis résumé (durée, volume, PR) une seule fois à la réouverture ; notification « Repos terminé » app en arrière-plan, aucune bannière app ouverte.
 - Remise à zéro d'un compteur hebdo / mensuel au changement réel de période (lundi, 1er du mois).
-- Routage Foundation Models des phrases `goalProgress`.
 
-Étape 7b (salle) :
-- Vraie dictée en salle (bruit) : « bench 85 kilos 5 reps », noms anglais, « exercice suivant », « fin de séance » ; routage Foundation Models des phrases gym.
-- Live Activity d'une séance : exercice, dernière série, chrono de repos ; Stop depuis l'écran verrouillé.
-- Notification « Repos terminé » app en arrière-plan ; aucune bannière app ouverte.
-- Saisie au doigt : + (copie), édition d'une pastille, menu contextuel Supprimer, « Exercice suivant », « Terminer » et résumé.
-- Courbes 3 / 6 / 12 mois après quelques vraies séances, création d'un exercice personnalisé et sa dictée.
+### 3. Widgets et contrôles
+- Widget « Prochain rappel » : préfixe « Rappel · » / « Tâche · », mise à jour après création / Fait / suppression, ouverture du détail au tap.
+- Widget « Prochaine prière » : compte à rebours, tap = espace Prière.
+- Contrôle « Prière faite » dans le Centre de contrôle ou en bas de l'écran verrouillé, y compris app fermée (coche appliquée à la réouverture, relances retirées).
 
-Étape 7a (prière) :
-- Horaires affichés face au calendrier de ta mosquée, une semaine ; préréglage Grande Mosquée de Paris si besoin.
-- Localisation à l'activation du module (autorisation, nom de ville), refus puis recherche de ville.
-- Notification d'adhan réelle et relances, action « Fait » sur l'écran verrouillé, mode discret.
-- Widget « Prochaine prière » sur l'écran verrouillé (compte à rebours), contrôle « Prière faite » dans le Centre de contrôle ou en bas de l'écran verrouillé, y compris app fermée.
-- Passage à minuit (prières manquées) et Isha cochée après minuit.
-- Routage Foundation Models des phrases `prayerCheck`.
+### 4. Gestes et saisie au doigt
+- Appui long sur le micro vert (formulaire manuel) et retour haptique.
+- Hub : réordonnancement par appui long, archivage par balayage ; toast : « Changer », puces d'espace, +1 et Annuler ; cercle Fait dans le détail d'espace.
+- Objectifs : formulaire (segmented, unité, période, échéance, étapes, exercice d'un objectif « Charge »), compteur ajustable, cercle atteint et sous-étapes, balayage « Archiver ».
+- Prière : coche et menu contextuel d'une ligne, réglages du module (méthode, ajustements, préréglage Grande Mosquée de Paris) ; horaires face au calendrier de ta mosquée pendant une semaine ; localisation à l'activation (autorisation, nom de ville), refus puis recherche de ville.
+- Salle : + (copie), édition d'une pastille, menu contextuel Supprimer, « Exercice suivant », « Terminer » et résumé ; création d'un exercice personnalisé et sa dictée ; courbes 3 / 6 / 12 mois après quelques vraies séances.

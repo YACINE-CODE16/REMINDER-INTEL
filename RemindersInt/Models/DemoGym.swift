@@ -74,6 +74,7 @@ enum DemoGym {
                 }
             }
             session.endedAt = clock
+            workout.summaryShownAt = clock
         }
 
         let exercises = GymService.shared.exercises()

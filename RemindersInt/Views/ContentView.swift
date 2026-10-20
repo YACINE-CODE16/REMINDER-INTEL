@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var isChangingSpace = false
     @State private var showsStats = false
     @State private var detailItem: TaskItem?
+    @State private var gymSummary: WorkoutSummary?
     #if DEBUG
     @State private var debugDictation: String?
     #endif
@@ -89,6 +90,9 @@ struct ContentView: View {
                 )
             }
         }
+        .sheet(item: $gymSummary) { summary in
+            WorkoutSummaryView(summary: summary)
+        }
         .sheet(item: $detailItem) { item in
             TaskDetailView(item: item)
         }
@@ -117,6 +121,8 @@ struct ContentView: View {
             notifications.syncSentCounts()
             tracking.resume()
             prayers.resume()
+            // A workout stopped from the Live Activity (or elsewhere) while away: its summary, once.
+            if let summary = GymService.shared.takePendingSummary() { gymSummary = summary }
             // Lock screen control whose intent ran in the widget extension.
             if captureRequests.takePending() { openVoiceCapture() }
         }

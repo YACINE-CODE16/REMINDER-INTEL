@@ -212,6 +212,7 @@ final class GymService {
     @discardableResult
     func finish(_ workout: Workout, at date: Date = .now) -> WorkoutSummary {
         clearRest(workout)
+        workout.summaryShownAt = date
         let summary = self.summary(of: workout, now: date)
         if workout.isActive {
             TrackingService.shared.stop(at: date)
@@ -224,9 +225,23 @@ final class GymService {
     func reopen(_ workout: Workout) {
         guard let session = workout.session, !session.isActive else { return }
         session.endedAt = nil
+        workout.summaryShownAt = nil
         try? context?.save()
         TrackingService.shared.resume()
         changed()
+    }
+
+    /// Summary of a workout ended outside the app in the last 12 hours, given once.
+    func takePendingSummary(now: Date = .now) -> WorkoutSummary? {
+        let recent = now.addingTimeInterval(-12 * 3600)
+        let ended = ((try? context?.fetch(FetchDescriptor<Workout>())) ?? []).filter { workout in
+            guard workout.summaryShownAt == nil, let session = workout.session, let end = session.endedAt else { return false }
+            return end >= recent
+        }
+        guard let latest = ended.max(by: { $0.startedAt < $1.startedAt }) else { return nil }
+        ended.forEach { $0.summaryShownAt = now }
+        try? context?.save()
+        return summary(of: latest, now: now)
     }
 
     func summary(of workout: Workout, now: Date = .now) -> WorkoutSummary {

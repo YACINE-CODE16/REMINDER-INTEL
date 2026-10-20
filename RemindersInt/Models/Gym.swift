@@ -153,6 +153,9 @@ final class Workout {
     var currentOrder: Int
     /// End of the running rest timer.
     var restEndsAt: Date?
+    /// When its summary was shown; nil for a workout ended outside the app (Live Activity
+    /// Stop, notification, "j'arrête"), whose summary shows at the next opening.
+    var summaryShownAt: Date?
 
     init(session: Session, template: WorkoutTemplate?) {
         self.id = UUID()
