@@ -10,6 +10,7 @@ struct TrackingView: View {
     /// Observed so the weekly targets refresh.
     @Query private var goals: [Goal]
     @State private var editedSession: Session?
+    @State private var sessionToDelete: Session?
     @State private var isAddingSession = false
     @State private var isPickingSpace = false
 
@@ -74,9 +75,10 @@ struct TrackingView: View {
                     }
                     .buttonStyle(.plain)
                     .glassListRow(top: 4, bottom: 4)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            withAnimation(.appSpring) { tracking.delete(session) }
+                    // No full swipe: deleting asks first (a gym workout goes with the session).
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            sessionToDelete = session
                         } label: {
                             Label("Supprimer", systemImage: "trash")
                         }
@@ -95,6 +97,19 @@ struct TrackingView: View {
         }
         .sheet(item: $editedSession) { session in
             SessionFormView(session: session)
+        }
+        .confirmationDialog(
+            "Supprimer cette session ?",
+            isPresented: Binding(get: { sessionToDelete != nil }, set: { if !$0 { sessionToDelete = nil } }),
+            titleVisibility: .visible,
+            presenting: sessionToDelete
+        ) { session in
+            Button("Supprimer", role: .destructive) {
+                withAnimation(.appSpring) { tracking.delete(session) }
+            }
+            Button("Garder", role: .cancel) {}
+        } message: { session in
+            Text(Self.deletionMessage(for: session))
         }
         .sheet(isPresented: $isAddingSession) {
             SessionFormView(space: recentSpaces.first)
@@ -268,6 +283,25 @@ struct TrackingView: View {
                 .foregroundStyle(Palette.blue)
                 .buttonStyle(.plain)
         }
+    }
+}
+
+extension TrackingView {
+    /// Says what goes with the session: its gym workout, sets and records included.
+    static func deletionMessage(for session: Session) -> String {
+        let length = TimeFormat.short(session.duration())
+        let space = session.space?.name ?? "sans espace"
+        guard let workout = session.workout else {
+            return "La session de \(length) dans \(space) sera supprimée."
+        }
+        let sets = workout.entries.flatMap(\.sets)
+        guard !sets.isEmpty else {
+            return "La session de \(length) et la séance de muscu « \(workout.name) » (sans série) seront supprimées."
+        }
+        let setLabel = sets.count > 1 ? "\(sets.count) séries" : "1 série"
+        let records = sets.filter(\.isPR).count
+        let recordLabel = records == 0 ? "" : records > 1 ? ", \(records) records" : ", 1 record"
+        return "La séance de muscu « \(workout.name) » sera supprimée avec elle : \(setLabel)\(recordLabel). Les records seront recalculés sans elle."
     }
 }
 

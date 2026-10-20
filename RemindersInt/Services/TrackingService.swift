@@ -127,10 +127,20 @@ final class TrackingService {
         refreshDailyReminders()
     }
 
+    /// Deletes a session; a gym workout attached to it goes with it (cascade), and the PRs of
+    /// its exercises are recomputed without the deleted sets.
     func delete(_ session: Session) {
         let wasActive = session.isActive
+        let exercises = (session.workout?.entries ?? []).compactMap(\.exercise)
         context?.delete(session)
         try? context?.save()
+        if !exercises.isEmpty {
+            var seen = Set<String>()
+            for exercise in exercises where seen.insert(exercise.id).inserted {
+                GymService.shared.recomputePRs(of: exercise)
+            }
+            try? context?.save()
+        }
         if wasActive {
             endActivities()
             center.removePendingNotificationRequests(withIdentifiers: [Self.longSessionRequestID])
