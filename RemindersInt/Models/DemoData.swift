@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import SwiftData
 
@@ -32,3 +33,4 @@ enum DemoData {
         samples.forEach(context.insert)
     }
 }
+#endif

@@ -5,7 +5,9 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    #if DEBUG
     @AppStorage(AppStorageKey.hasSeededDemoData) private var hasSeededDemoData = false
+    #endif
     @AppStorage(AppStorageKey.defaultRepeatInterval) private var defaultRepeatInterval: RepeatInterval = .every15min
 
     @State private var selectedTab: AppTab = .day
@@ -97,11 +99,6 @@ struct ContentView: View {
             TaskDetailView(item: item)
         }
         .task {
-            if !hasSeededDemoData {
-                DemoData.insert(into: modelContext)
-                try? modelContext.save()
-                hasSeededDemoData = true
-            }
             #if DEBUG
             await applyDebugLaunchArguments()
             // Screenshots on a fresh simulator: no permission alert over the UI.
@@ -306,11 +303,18 @@ struct ContentView: View {
 
     #if DEBUG
     /// Screenshot and test helpers:
-    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-seedDemoPrayer YES` ("Prière" space, 20 weeks of prayers, once; `-resetDemoPrayer YES` first to redo it), `-prayerNotificationTest YES` (adhan in 5 s + follow-up), `-seedDemoGym YES` ("Salle" space, 20 weeks of workouts, once; `-resetDemoGym YES` first to redo it), `-prayerLogNotifications YES` (prints pending prayer requests), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
+    /// `-uiDayOffset <n>` (day shown in the day view), `-seedDemoData YES` (sample reminders and tasks, once), `-seedDemoSessions YES` (two weeks of sessions, once), `-seedDemoGoals YES` (3 goals per kind, once), `-seedDemoPrayer YES` ("Prière" space, 20 weeks of prayers, once; `-resetDemoPrayer YES` first to redo it), `-prayerNotificationTest YES` (adhan in 5 s + follow-up), `-seedDemoGym YES` ("Salle" space, 20 weeks of workouts, once; `-resetDemoGym YES` first to redo it), `-prayerLogNotifications YES` (prints pending prayer requests), `-uiTab day|month|spaces|tracking|stats|settings`, `-uiSpace <name>` (opens that space),
     /// `-uiScreen capture|detail|form`, `-uiDictation "<phrase>"` (validated through the
     /// simulated dictation field), `-parserSelfTest YES` (prints the routing table).
     private func applyDebugLaunchArguments() async {
         let defaults = UserDefaults.standard
+        // Sample reminders and tasks: DEBUG only, on request; a release install starts empty
+        // (only the default spaces of StoreSetup).
+        if defaults.bool(forKey: "seedDemoData"), !hasSeededDemoData {
+            DemoData.insert(into: modelContext)
+            try? modelContext.save()
+            hasSeededDemoData = true
+        }
         if defaults.bool(forKey: "seedDemoSessions") {
             DemoSessions.insert(into: modelContext)
         }
